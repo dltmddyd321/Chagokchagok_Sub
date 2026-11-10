@@ -2,6 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- AR 미지원 기기에도 설치는 되도록 optional (측정 화면에서 지원 여부 안내) -->
+    <uses-feature
+        android:name="android.hardware.camera.ar"
+        android:required="false" />
+    <uses-feature
+        android:glEsVersion="0x00020000"
+        android:required="true" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -11,10 +21,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.HyundaeSub">
+
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.HyundaeSub">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
