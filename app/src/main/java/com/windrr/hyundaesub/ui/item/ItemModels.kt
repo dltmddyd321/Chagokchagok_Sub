@@ -1,5 +1,7 @@
 package com.windrr.hyundaesub.ui.item
 
+import com.windrr.hyundaesub.ui.component.sizeLabelOf
+
 /** 짐을 어디서 가져올지 */
 enum class ItemSource { NEW, SAVED }
 
@@ -15,6 +17,12 @@ data class PickedItem(
     val heightCm: Int,
     val quantity: Int = 1,
     val savedItemId: String? = null,
+    /** 이번 배치 추천에 포함할지 (짐 선택 목록의 체크박스) */
+    val selected: Boolean = true,
 ) {
-    val sizeLabel: String get() = "${widthCm}×${depthCm}×${heightCm}cm"
+    val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
+
+    companion object {
+        const val MAX_QUANTITY = 20
+    }
 }

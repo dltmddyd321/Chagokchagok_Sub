@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.item.saved
 
+import com.windrr.hyundaesub.ui.component.sizeLabelOf
 import com.windrr.hyundaesub.ui.item.PickedItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -12,7 +13,7 @@ data class SavedItem(
     val depthCm: Int,
     val heightCm: Int,
 ) {
-    val sizeLabel: String get() = "$widthCm × $depthCm × $heightCm cm"
+    val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
 }
 
 /** 저장한 물건 목록 출처. DB 테이블 만들면 Room 구현으로 교체 */

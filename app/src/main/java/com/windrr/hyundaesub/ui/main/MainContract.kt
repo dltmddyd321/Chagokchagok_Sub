@@ -97,9 +97,14 @@ sealed interface MainIntent {
     /** 불러오기·측정 화면에서 뒤로 → 짐 선택 */
     data object BackToItemSelect : MainIntent
 
-    data class RemovePickedItem(val key: String) : MainIntent
+    /** 짐 선택 목록: 체크(배치 추천에 포함) 토글 */
+    data class TogglePickedItem(val key: String) : MainIntent
 
-    /** 짐 선택 완료 → 다음 단계 (시안 대기) */
+    data class IncreasePickedQuantity(val key: String) : MainIntent
+
+    data class DecreasePickedQuantity(val key: String) : MainIntent
+
+    /** 짐 배치 추천받기 (다음 단계 시안 대기) */
     data object ItemsDone : MainIntent
 
     /** AR 측정 화면에서 뒤로 */

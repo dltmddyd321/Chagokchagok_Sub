@@ -7,7 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,19 +27,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
 import com.windrr.hyundaesub.ui.component.FlowTopBar
+import com.windrr.hyundaesub.ui.component.ItemCard
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
-import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokNavy
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
 import com.windrr.hyundaesub.ui.theme.ChagokTextSecondary
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 
 /**
- * 짐 등록 흐름 3단계: 어떤 짐을 가져갈지.
+ * 짐 등록 흐름: 어떤 짐을 가져갈지.
+ * - 담은 짐이 없으면: 새 물건 추가 / 등록된 물건 불러오기 카드만
+ * - 담은 짐이 있으면: 짐 카드 목록(체크·수량) + 아래에 추가 카드, "짐 배치 추천받기"
  * 상태(담은 짐·마지막 선택)는 상위 MainViewModel이 들고 있다.
  */
 @Composable
@@ -49,10 +52,13 @@ fun ItemSelectScreen(
     onBack: () -> Unit,
     onAddNew: () -> Unit,
     onLoadSaved: () -> Unit,
-    onRemoveItem: (key: String) -> Unit,
+    onToggleItem: (key: String) -> Unit,
+    onIncrease: (key: String) -> Unit,
+    onDecrease: (key: String) -> Unit,
     onNext: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    val hasItems = pickedItems.isNotEmpty()
 
     Column(
         modifier = Modifier
@@ -63,58 +69,68 @@ fun ItemSelectScreen(
             .padding(horizontal = 20.dp),
     ) {
         FlowTopBar(step = 1, onBack = onBack)
-        Spacer(Modifier.height(40.dp))
-        Text(
-            text = "어떤 짐을 가져갈까요?",
-            color = ChagokTextPrimary,
-            fontSize = 28.sp,
-            lineHeight = 38.sp,
-            fontWeight = FontWeight.ExtraBold,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "저장한 짐을 새로 선택하거나 등록해요.",
-            color = ChagokTextSecondary,
-            fontSize = 15.sp,
-        )
-        Spacer(Modifier.height(48.dp))
 
-        SourceCard(
-            text = "+ 새 물건 추가",
-            selected = lastSource == ItemSource.NEW,
-            height = 108,
-            onClick = onAddNew,
-        )
-        Spacer(Modifier.height(20.dp))
-        SourceCard(
-            text = "+ 등록된 물건 불러오기",
-            selected = lastSource == ItemSource.SAVED,
-            height = 80,
-            onClick = onLoadSaved,
-        )
-
-        Spacer(Modifier.height(24.dp))
-        // 담은 짐 목록 (없으면 아무것도 안 보임 — 시안 기본 상태)
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
         ) {
-            if (pickedItems.isNotEmpty()) {
-                item {
+            item {
+                Column {
                     Text(
-                        text = "담은 짐 ${pickedItems.sumOf { it.quantity }}개",
-                        color = ChagokTextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = "어떤 짐을 가져갈까요?",
+                        color = ChagokTextPrimary,
+                        fontSize = 28.sp,
+                        lineHeight = 38.sp,
+                        fontWeight = FontWeight.ExtraBold,
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "저장한 물건을 선택하거나 새로 등록해요.",
+                        color = ChagokTextSecondary,
+                        fontSize = 15.sp,
+                    )
+                    Spacer(Modifier.height(if (hasItems) 12.dp else 32.dp))
                 }
             }
+
             items(pickedItems, key = { it.key }) { item ->
-                PickedItemRow(item = item, onRemove = { onRemoveItem(item.key) })
+                ItemCard(
+                    name = item.name,
+                    sizeLabel = item.sizeLabel,
+                    checked = item.selected,
+                    quantity = item.quantity,
+                    onToggle = { onToggleItem(item.key) },
+                    onDecrease = { onDecrease(item.key) },
+                    onIncrease = { onIncrease(item.key) },
+                    maxQuantity = PickedItem.MAX_QUANTITY,
+                )
+            }
+
+            // 짐이 있으면 목록 아래에 작게, 없으면 시안 기본 크기로
+            item {
+                SourceCard(
+                    text = "+ 새 물건 추가",
+                    selected = !hasItems && lastSource == ItemSource.NEW,
+                    height = if (hasItems) 64.dp else 108.dp,
+                    onClick = onAddNew,
+                )
+            }
+            item {
+                SourceCard(
+                    text = "+ 등록된 물건 불러오기",
+                    selected = !hasItems && lastSource == ItemSource.SAVED,
+                    height = if (hasItems) 64.dp else 80.dp,
+                    onClick = onLoadSaved,
+                )
             }
         }
 
-        ChagokPrimaryButton(text = "다음", onClick = onNext, enabled = pickedItems.isNotEmpty())
+        ChagokPrimaryButton(
+            text = "짐 배치 추천받기",
+            onClick = onNext,
+            enabled = pickedItems.any { it.selected },
+        )
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -124,7 +140,7 @@ fun ItemSelectScreen(
 private fun SourceCard(
     text: String,
     selected: Boolean,
-    height: Int,
+    height: Dp,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(20.dp)
@@ -136,7 +152,7 @@ private fun SourceCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(height.dp)
+            .height(height)
             .clip(shape)
             .background(background)
             .border(
@@ -156,43 +172,34 @@ private fun SourceCard(
     }
 }
 
+private val SelectedCardTint = Color(0xFFE6EDFB)
+private val UnselectedBorder = Color(0xFFE6EAF1)
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "짐 있음")
 @Composable
-private fun PickedItemRow(item: PickedItem, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
-            .border(1.dp, ChagokCardBorder, RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = item.name, color = ChagokTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = "${item.sizeLabel} · ${item.quantity}개",
-                color = ChagokTextSecondary,
-                fontSize = 13.sp,
-            )
-        }
-        Text(
-            text = "삭제",
-            color = ChagokTextSecondary,
-            fontSize = 13.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onRemove)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+private fun ItemSelectScreenPreview() {
+    HyundaeSubTheme {
+        ItemSelectScreen(
+            pickedItems = listOf(
+                PickedItem("1", "유모차", 42, 58, 88),
+                PickedItem("2", "캠핑박스 L", 60, 40, 35, savedItemId = "s1"),
+                PickedItem("3", "캠핑박스 S", 50, 40, 40, savedItemId = "s2"),
+            ),
+            lastSource = ItemSource.SAVED,
+            onBack = {},
+            onAddNew = {},
+            onLoadSaved = {},
+            onToggleItem = {},
+            onIncrease = {},
+            onDecrease = {},
+            onNext = {},
         )
     }
 }
 
-private val SelectedCardTint = Color(0xFFE6EDFB)
-private val UnselectedBorder = Color(0xFFE6EAF1)
-
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
+@Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "빈 상태")
 @Composable
-private fun ItemSelectScreenPreview() {
+private fun ItemSelectEmptyPreview() {
     HyundaeSubTheme {
         ItemSelectScreen(
             pickedItems = emptyList(),
@@ -200,7 +207,9 @@ private fun ItemSelectScreenPreview() {
             onBack = {},
             onAddNew = {},
             onLoadSaved = {},
-            onRemoveItem = {},
+            onToggleItem = {},
+            onIncrease = {},
+            onDecrease = {},
             onNext = {},
         )
     }

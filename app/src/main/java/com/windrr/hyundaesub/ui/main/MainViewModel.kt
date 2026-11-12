@@ -50,8 +50,13 @@ class MainViewModel : ViewModel() {
                 it.copy(route = MainRoute.ITEM_SELECT, pickedItems = merge(it.pickedItems, intent.items))
             }
             MainIntent.BackToItemSelect -> _state.update { it.copy(route = MainRoute.ITEM_SELECT) }
-            is MainIntent.RemovePickedItem -> _state.update {
-                it.copy(pickedItems = it.pickedItems.filterNot { item -> item.key == intent.key })
+            is MainIntent.TogglePickedItem -> updatePicked(intent.key) { it.copy(selected = !it.selected) }
+            is MainIntent.IncreasePickedQuantity -> updatePicked(intent.key) {
+                // +는 체크도 같이 (내 물건 가져오기와 동일)
+                it.copy(quantity = (it.quantity + 1).coerceAtMost(PickedItem.MAX_QUANTITY), selected = true)
+            }
+            is MainIntent.DecreasePickedQuantity -> updatePicked(intent.key) {
+                it.copy(quantity = (it.quantity - 1).coerceAtLeast(1))
             }
             // TODO: 다음 단계(배치 결과) 시안 나오면 연결
             MainIntent.ItemsDone -> Unit
@@ -74,6 +79,12 @@ class MainViewModel : ViewModel() {
             }
             MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
+        }
+    }
+
+    private fun updatePicked(key: String, transform: (PickedItem) -> PickedItem) {
+        _state.update { state ->
+            state.copy(pickedItems = state.pickedItems.map { if (it.key == key) transform(it) else it })
         }
     }
 

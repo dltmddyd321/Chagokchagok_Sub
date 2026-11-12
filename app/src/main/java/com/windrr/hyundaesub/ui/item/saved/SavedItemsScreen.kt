@@ -48,7 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
 import com.windrr.hyundaesub.ui.component.FlowTopBar
-import com.windrr.hyundaesub.ui.component.QuantityStepper
+import com.windrr.hyundaesub.ui.component.ItemCard
 import com.windrr.hyundaesub.ui.item.PickedItem
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
@@ -124,11 +124,14 @@ fun SavedItemsScreen(
                     contentPadding = PaddingValues(bottom = 20.dp),
                 ) {
                     items(state.visibleItems, key = { it.id }) { item ->
-                        SavedItemCard(
-                            item = item,
-                            selected = item.id in state.selectedIds,
+                        ItemCard(
+                            name = item.name,
+                            sizeLabel = item.sizeLabel,
+                            checked = item.id in state.selectedIds,
                             quantity = state.quantityOf(item.id),
-                            onIntent = onIntent,
+                            onToggle = { onIntent(SavedItemsIntent.ToggleItem(item.id)) },
+                            onDecrease = { onIntent(SavedItemsIntent.Decrease(item.id)) },
+                            onIncrease = { onIntent(SavedItemsIntent.Increase(item.id)) },
                         )
                     }
                 }
@@ -180,85 +183,6 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
     }
 }
 
-/** 물건 카드: 썸네일·이름·크기·체크 + 수량 조절. 체크 시 네이비 테두리 */
-@Composable
-private fun SavedItemCard(
-    item: SavedItem,
-    selected: Boolean,
-    quantity: Int,
-    onIntent: (SavedItemsIntent) -> Unit,
-) {
-    val shape = RoundedCornerShape(20.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(Color.White)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) ChagokNavy else ChagokCardBorder, shape)
-            .clickable { onIntent(SavedItemsIntent.ToggleItem(item.id)) }
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            ItemThumbnail()
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f).padding(top = 4.dp)) {
-                Text(text = item.name, color = ChagokTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(text = item.sizeLabel, color = ChagokTextSecondary, fontSize = 13.sp)
-            }
-            CheckBox(checked = selected)
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "수량", color = ChagokTextSecondary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            QuantityStepper(
-                quantity = quantity,
-                onDecrease = { onIntent(SavedItemsIntent.Decrease(item.id)) },
-                onIncrease = { onIntent(SavedItemsIntent.Increase(item.id)) },
-            )
-        }
-    }
-}
-
-/** 임시 썸네일: 물건 사진 받으면 Image로 교체 */
-@Composable
-private fun ItemThumbnail() {
-    Box(
-        modifier = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(Color.White, ThumbnailTint))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_tab_luggage),
-            contentDescription = null,
-            tint = ThumbnailIcon,
-            modifier = Modifier.size(30.dp),
-        )
-    }
-}
-
-@Composable
-private fun CheckBox(checked: Boolean) {
-    if (checked) {
-        Icon(
-            painter = painterResource(R.drawable.ic_checkbox_checked),
-            contentDescription = "선택됨",
-            tint = Color.Unspecified,
-            modifier = Modifier.size(22.dp),
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .padding(2.dp)
-                .size(18.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .border(1.5.dp, UncheckedBorder, RoundedCornerShape(3.dp)),
-        )
-    }
-}
-
 @Composable
 private fun EmptyMessage(title: String, body: String) {
     Column(
@@ -282,9 +206,6 @@ private fun EmptyMessage(title: String, body: String) {
 }
 
 private val Placeholder = Color(0xFF8A90A0)
-private val ThumbnailTint = Color(0xFFDCE6FB)
-private val ThumbnailIcon = Color(0xFFB07A3E)
-private val UncheckedBorder = Color(0xFFB8BECB)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "목록")
 @Composable

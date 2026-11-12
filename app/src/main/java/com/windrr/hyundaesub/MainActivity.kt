@@ -49,7 +49,9 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackToSeatSelect) },
                         onAddNew = { viewModel.onIntent(MainIntent.AddNewItem) },
                         onLoadSaved = { viewModel.onIntent(MainIntent.OpenSavedItems) },
-                        onRemoveItem = { viewModel.onIntent(MainIntent.RemovePickedItem(it)) },
+                        onToggleItem = { viewModel.onIntent(MainIntent.TogglePickedItem(it)) },
+                        onIncrease = { viewModel.onIntent(MainIntent.IncreasePickedQuantity(it)) },
+                        onDecrease = { viewModel.onIntent(MainIntent.DecreasePickedQuantity(it)) },
                         onNext = { viewModel.onIntent(MainIntent.ItemsDone) },
                     )
                     MainRoute.SAVED_ITEMS -> SavedItemsRoute(
