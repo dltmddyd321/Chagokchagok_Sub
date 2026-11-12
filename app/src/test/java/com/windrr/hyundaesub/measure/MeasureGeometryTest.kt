@@ -80,4 +80,38 @@ class MeasureGeometryTest {
         assertEquals(25f, MeasureGeometry.roundUpForFit(19.5f, marginCm = 1f), 0f)
         assertEquals(60f, MeasureGeometry.roundUpForFit(55.3f, marginCm = 1f), 0f)
     }
+
+    @Test
+    fun rectifyFloor_alreadyRightAngle_keepsPoints() {
+        val rect = MeasureGeometry.rectifyFloor(Vec3(0f, 0f, 0f), Vec3(0.4f, 0f, 0f), Vec3(0.4f, 0f, -0.3f))
+        assertEquals(0.4f, rect.width, 1e-5f)
+        assertEquals(0.3f, rect.depth, 1e-5f)
+        assertEquals(0f, rect.d.x, 1e-5f)
+        assertEquals(-0.3f, rect.d.z, 1e-5f)
+    }
+
+    @Test
+    fun rectifyFloor_slantedC_projectsToRightAngle() {
+        // C가 가로 방향으로 10cm 비껴 찍힘 → 세로는 수직 성분 30cm만
+        val rect = MeasureGeometry.rectifyFloor(Vec3(0f, 0f, 0f), Vec3(0.4f, 0f, 0f), Vec3(0.5f, 0f, -0.3f))
+        assertEquals(0.4f, rect.width, 1e-5f)
+        assertEquals(0.3f, rect.depth, 1e-5f)
+        assertEquals(0.4f, rect.c.x, 1e-5f)
+        // 네 변이 직각: AB · BC = 0
+        assertEquals(0f, (rect.b - rect.a) dot (rect.c - rect.b), 1e-6f)
+    }
+
+    @Test
+    fun rectifyFloor_flattensToFloorOfA() {
+        val rect = MeasureGeometry.rectifyFloor(Vec3(0f, 0.01f, 0f), Vec3(0.4f, -0.02f, 0f), Vec3(0.4f, 0.03f, -0.3f))
+        rect.corners.forEach { assertEquals(0.01f, it.y, 1e-6f) }
+    }
+
+    @Test
+    fun floorRect_topRaisesAllCorners() {
+        val rect = MeasureGeometry.rectifyFloor(Vec3(0f, 0f, 0f), Vec3(0.4f, 0f, 0f), Vec3(0.4f, 0f, -0.3f))
+        val top = rect.top(0.25f)
+        assertEquals(4, top.size)
+        top.forEach { assertEquals(0.25f, it.y, 1e-6f) }
+    }
 }

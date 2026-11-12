@@ -3,6 +3,7 @@ package com.windrr.hyundaesub.ui.main
 import androidx.annotation.DrawableRes
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.data.local.entity.SeatCode
+import com.windrr.hyundaesub.measure.BoxSize
 import com.windrr.hyundaesub.ui.item.ItemSource
 import com.windrr.hyundaesub.ui.item.PickedItem
 
@@ -96,6 +97,9 @@ sealed interface MainIntent {
 
     /** AR 측정 화면에서 뒤로 */
     data object CloseMeasure : MainIntent
+
+    /** AR 측정 완료 → 짐 목록에 담고 짐 선택으로 */
+    data class ItemMeasured(val size: BoxSize) : MainIntent
 
     /** 전체 화면에서 뒤로 → 탭 화면 */
     data object BackToTabs : MainIntent

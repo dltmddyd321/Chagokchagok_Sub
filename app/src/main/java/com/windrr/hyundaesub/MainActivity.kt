@@ -61,7 +61,10 @@ class MainActivity : ComponentActivity() {
                         onManualInput = { viewModel.onIntent(MainIntent.OpenManualInput) },
                         onStartAr = { viewModel.onIntent(MainIntent.StartArMeasure) },
                     )
-                    MainRoute.MEASURE -> ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.CloseMeasure) })
+                    MainRoute.MEASURE -> ArMeasureScreen(
+                        onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },
+                        onMeasured = { viewModel.onIntent(MainIntent.ItemMeasured(it)) },
+                    )
                 }
             }
         }

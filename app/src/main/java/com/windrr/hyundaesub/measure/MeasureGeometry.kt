@@ -20,7 +20,23 @@ data class Vec3(val x: Float, val y: Float, val z: Float) {
 data class Ray(val origin: Vec3, val direction: Vec3)
 
 /** 측정 결과 (cm) */
-data class BoxSize(val widthCm: Float?, val depthCm: Float?, val heightCm: Float?)
+data class BoxSize(val widthCm: Float?, val depthCm: Float?, val heightCm: Float?) {
+    val isComplete: Boolean get() = widthCm != null && depthCm != null && heightCm != null
+}
+
+/** 바닥 직사각형 네 꼭짓점 (A → B → C → D 순서로 한 바퀴) */
+data class FloorRect(val a: Vec3, val b: Vec3, val c: Vec3, val d: Vec3) {
+    val corners: List<Vec3> get() = listOf(a, b, c, d)
+
+    /** A→B 수평 길이 (m) */
+    val width: Float get() = MeasureGeometry.horizontalDistance(a, b)
+
+    /** B→C 수평 길이 (m) */
+    val depth: Float get() = MeasureGeometry.horizontalDistance(b, c)
+
+    /** 같은 바닥 꼭짓점을 height(m)만큼 올린 윗면 */
+    fun top(height: Float): List<Vec3> = corners.map { it + Vec3.UP * height }
+}
 
 object MeasureGeometry {
 
@@ -29,6 +45,33 @@ object MeasureGeometry {
         val d = b - a
         return sqrt(d.x * d.x + d.z * d.z)
     }
+
+    /**
+     * 사용자가 찍은 바닥 세 점 A·B·C를 직사각형으로 바로잡는다.
+     * - A→B를 가로 방향으로 고정
+     * - C는 A→B에 수직인 성분만 남겨 C'로 (손 떨림으로 비스듬히 찍혀도 직각 유지)
+     * - D' = A + (C' − B), 네 꼭짓점 모두 A의 바닥 높이(y)로 맞춘다
+     * A·B가 거의 같은 점이면 직각을 정할 수 없어 C를 그대로 쓴다.
+     */
+    fun rectifyFloor(a: Vec3, b: Vec3, c: Vec3): FloorRect {
+        val floorY = a.y
+        val flatA = Vec3(a.x, floorY, a.z)
+        val flatB = Vec3(b.x, floorY, b.z)
+        val flatC = Vec3(c.x, floorY, c.z)
+        val ab = flatB - flatA
+        val bc = flatC - flatB
+        val abLength = ab.length()
+        val side = if (abLength < MIN_EDGE_M) {
+            bc
+        } else {
+            val u = ab * (1f / abLength)
+            bc - u * (bc dot u)
+        }
+        return FloorRect(flatA, flatB, flatB + side, flatA + side)
+    }
+
+    /** 바닥 직사각형을 정하기에 너무 짧은 변 (m) */
+    private const val MIN_EDGE_M = 0.005f
 
     /**
      * base에서 위로 세운 수직선과 카메라 시선이 가장 가까워지는 지점의 높이(m).
