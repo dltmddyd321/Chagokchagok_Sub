@@ -23,9 +23,12 @@ class Converters {
     @TypeConverter
     fun jsonToSeats(value: String): List<SeatCode> = jsonToStrings(value).map { SeatCode.valueOf(it) }
 
+    /** 허용 방향은 저장·조회 모두 정책대로 보정 (중복 제거, 비면 6방향) */
     @TypeConverter
-    fun orientationsToJson(value: List<Orientation>): String = stringsToJson(value.map { it.name })
+    fun orientationsToJson(value: List<Orientation>): String =
+        stringsToJson(Orientation.normalizeAllowed(value).map { it.name })
 
     @TypeConverter
-    fun jsonToOrientations(value: String): List<Orientation> = jsonToStrings(value).map { Orientation.valueOf(it) }
+    fun jsonToOrientations(value: String): List<Orientation> =
+        Orientation.normalizeAllowed(jsonToStrings(value).mapNotNull { name -> Orientation.entries.find { it.name == name } })
 }

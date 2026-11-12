@@ -70,6 +70,8 @@ object DummyPlans {
                 depthCm = 20,
                 heightCm = 60,
                 defaultQuantity = 2,
+                // 서버 예시와 동일: 세운 채로만
+                allowedOrientations = SavedItemEntity.UPRIGHT_ORIENTATIONS,
                 dimensionSource = DimensionSource.AR,
                 createdAt = minutesAgo(3),
             ),

@@ -32,10 +32,10 @@ data class SavedItemEntity(
     val defaultQuantity: Int = 1,
     /**
      * 실을 때 허용하는 회전 (json 배열). 계획 짐으로 담을 때 서버에 같이 보낸다.
-     * 기본은 세운 채 바닥면만 돌리기 (WDH, DWH)
+     * 6개 중 중복 없는 1개 이상, 지정하지 않으면 6방향 모두 ([Orientation.normalizeAllowed]로 저장·조회 시 보정)
      */
     @ColumnInfo(name = "allowed_orientations")
-    val allowedOrientations: List<Orientation> = UPRIGHT_ORIENTATIONS,
+    val allowedOrientations: List<Orientation> = Orientation.ALL,
     @ColumnInfo(name = "dimension_source")
     val dimensionSource: DimensionSource,
     /** 등록 시각 (epoch ms) — 최근 등록 순 정렬 */
@@ -43,7 +43,7 @@ data class SavedItemEntity(
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     companion object {
-        /** 높이 방향은 그대로 두고 가로·세로만 바꿔 놓을 수 있음 */
+        /** 세운 채 바닥면만 돌리기 (높이 방향 고정) — 의자·유모차처럼 눕히면 안 되는 짐 */
         val UPRIGHT_ORIENTATIONS = listOf(Orientation.WDH, Orientation.DWH)
     }
 }

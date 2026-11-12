@@ -27,6 +27,7 @@ class SavedItemDaoTest {
         depthCm = 20,
         heightCm = 60,
         defaultQuantity = 2,
+        allowedOrientations = SavedItemEntity.UPRIGHT_ORIENTATIONS,
         dimensionSource = DimensionSource.AR,
         createdAt = 1_000L,
     )
@@ -36,7 +37,6 @@ class SavedItemDaoTest {
         widthCm = 60,
         depthCm = 40,
         heightCm = 35,
-        allowedOrientations = Orientation.entries,
         dimensionSource = DimensionSource.MANUAL,
         createdAt = 2_000L,
     )
@@ -59,7 +59,8 @@ class SavedItemDaoTest {
         val items = db.savedItemDao().observeAll().first()
         assertEquals(listOf("box", "chair"), items.map { it.savedItemId })
         assertEquals(listOf(Orientation.WDH, Orientation.DWH), items.last().allowedOrientations)
-        assertEquals(6, items.first().allowedOrientations.size)
+        // 지정 안 하면 6방향
+        assertEquals(Orientation.ALL, items.first().allowedOrientations)
         assertEquals(DimensionSource.AR, items.last().dimensionSource)
     }
 
@@ -71,5 +72,17 @@ class SavedItemDaoTest {
 
         db.savedItemDao().delete("chair")
         assertNull(db.savedItemDao().get("chair"))
+    }
+
+    @Test
+    fun allowedOrientations_duplicatesAndEmpty_followPolicy() = runBlocking {
+        db.savedItemDao().upsert(
+            chair.copy(allowedOrientations = listOf(Orientation.DWH, Orientation.WDH, Orientation.DWH)),
+            box.copy(allowedOrientations = emptyList()),
+        )
+        // 중복 제거 + enum 순서
+        assertEquals(listOf(Orientation.WDH, Orientation.DWH), db.savedItemDao().get("chair")?.allowedOrientations)
+        // 비면 6방향
+        assertEquals(Orientation.ALL, db.savedItemDao().get("box")?.allowedOrientations)
     }
 }
