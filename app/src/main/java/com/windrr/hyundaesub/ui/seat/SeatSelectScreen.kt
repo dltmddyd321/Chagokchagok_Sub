@@ -83,7 +83,7 @@ fun SeatSelectScreen(
             .navigationBarsPadding(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            FlowTopBar(step = 1, onBack = onBack)
+            FlowTopBar(step = 0, onBack = onBack)
             Spacer(Modifier.height(40.dp))
             Text(
                 text = "탑승할 좌석을\n선택해 주세요",

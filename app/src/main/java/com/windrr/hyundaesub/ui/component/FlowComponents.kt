@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
 
-/** 짐 등록 흐름 단계 수 (차량 → 좌석 → 짐) */
+/** 짐 등록 흐름 단계 점 수 (시안: 차량·좌석=0, 짐=1, 결과=2) */
 const val LOAD_FLOW_STEPS = 3
 
 /** 짐 등록 흐름 상단: 뒤로가기 + 단계 점 */

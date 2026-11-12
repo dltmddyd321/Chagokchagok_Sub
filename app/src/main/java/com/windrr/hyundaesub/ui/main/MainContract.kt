@@ -3,6 +3,8 @@ package com.windrr.hyundaesub.ui.main
 import androidx.annotation.DrawableRes
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.data.local.entity.SeatCode
+import com.windrr.hyundaesub.ui.item.ItemSource
+import com.windrr.hyundaesub.ui.item.PickedItem
 
 enum class MainTab(val label: String, @DrawableRes val iconRes: Int) {
     HOME("홈", R.drawable.ic_tab_home),
@@ -21,6 +23,12 @@ enum class MainRoute {
     /** 짐 등록 2단계: 좌석 선택 */
     SEAT_SELECT,
 
+    /** 짐 등록 3단계: 어떤 짐을 가져갈지 */
+    ITEM_SELECT,
+
+    /** 짐 선택 > 등록된 물건 불러오기 */
+    SAVED_ITEMS,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -34,6 +42,12 @@ data class MainUiState(
     val occupiedSeats: Set<SeatCode> = emptySet(),
     /** 짐 등록 흐름을 새로 시작할 때마다 증가 — 단계별 ViewModel을 새로 만드는 키 */
     val loadFlowId: Int = 0,
+    /** 이번 계획에 담은 짐 */
+    val pickedItems: List<PickedItem> = emptyList(),
+    /** 짐 선택 화면에서 마지막으로 고른 방식 (카드 강조용) */
+    val lastItemSource: ItemSource? = null,
+    /** AR 측정에서 뒤로 갈 때 돌아갈 화면 */
+    val measureReturnRoute: MainRoute = MainRoute.TABS,
 )
 
 sealed interface MainIntent {
@@ -45,11 +59,34 @@ sealed interface MainIntent {
     /** 차량 선택 완료 → 좌석 선택 */
     data class VehicleSelected(val vehicleId: String) : MainIntent
 
-    /** 좌석 선택 완료 → 다음 단계 */
+    /** 좌석 선택 완료 → 짐 선택 */
     data class SeatsSelected(val seats: Set<SeatCode>) : MainIntent
 
     /** 좌석 선택에서 뒤로 → 차량 선택 */
     data object BackToVehicleSelect : MainIntent
+
+    /** 짐 선택에서 뒤로 → 좌석 선택 */
+    data object BackToSeatSelect : MainIntent
+
+    /** 짐 선택 > 새 물건 추가 (AR 측정) */
+    data object AddNewItem : MainIntent
+
+    /** 짐 선택 > 등록된 물건 불러오기 */
+    data object OpenSavedItems : MainIntent
+
+    /** 불러오기 화면에서 저장 → 짐 선택으로 돌아가며 담기 */
+    data class SavedItemsPicked(val items: List<PickedItem>) : MainIntent
+
+    /** 불러오기·측정 화면에서 뒤로 → 짐 선택 */
+    data object BackToItemSelect : MainIntent
+
+    data class RemovePickedItem(val key: String) : MainIntent
+
+    /** 짐 선택 완료 → 다음 단계 (시안 대기) */
+    data object ItemsDone : MainIntent
+
+    /** AR 측정 화면에서 뒤로 */
+    data object CloseMeasure : MainIntent
 
     /** 전체 화면에서 뒤로 → 탭 화면 */
     data object BackToTabs : MainIntent

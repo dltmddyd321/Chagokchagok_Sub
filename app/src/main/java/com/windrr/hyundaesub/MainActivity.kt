@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.measure.ArMeasureScreen
+import com.windrr.hyundaesub.ui.item.ItemSelectScreen
+import com.windrr.hyundaesub.ui.item.saved.SavedItemsRoute
 import com.windrr.hyundaesub.ui.main.MainIntent
 import com.windrr.hyundaesub.ui.main.MainRoute
 import com.windrr.hyundaesub.ui.main.MainScreen
@@ -39,7 +41,21 @@ class MainActivity : ComponentActivity() {
                         onNext = { viewModel.onIntent(MainIntent.SeatsSelected(it)) },
                         viewModel = viewModel(key = "seat-${state.loadFlowId}"),
                     )
-                    MainRoute.MEASURE -> ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.BackToTabs) })
+                    MainRoute.ITEM_SELECT -> ItemSelectScreen(
+                        pickedItems = state.pickedItems,
+                        lastSource = state.lastItemSource,
+                        onBack = { viewModel.onIntent(MainIntent.BackToSeatSelect) },
+                        onAddNew = { viewModel.onIntent(MainIntent.AddNewItem) },
+                        onLoadSaved = { viewModel.onIntent(MainIntent.OpenSavedItems) },
+                        onRemoveItem = { viewModel.onIntent(MainIntent.RemovePickedItem(it)) },
+                        onNext = { viewModel.onIntent(MainIntent.ItemsDone) },
+                    )
+                    MainRoute.SAVED_ITEMS -> SavedItemsRoute(
+                        onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
+                        onDone = { viewModel.onIntent(MainIntent.SavedItemsPicked(it)) },
+                        viewModel = viewModel(key = "saved-${state.loadFlowId}"),
+                    )
+                    MainRoute.MEASURE -> ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.CloseMeasure) })
                 }
             }
         }
