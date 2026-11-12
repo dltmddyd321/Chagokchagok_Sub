@@ -30,7 +30,7 @@ import com.windrr.hyundaesub.data.local.entity.VehicleEntity
         PackingSpaceEntity::class,
         PlacementEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

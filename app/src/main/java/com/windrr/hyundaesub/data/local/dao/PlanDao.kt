@@ -40,9 +40,21 @@ abstract class PlanDao {
     @Query("SELECT * FROM `plan` WHERE plan_id = :planId")
     abstract fun observePlan(planId: String): Flow<PlanWithDetails?>
 
+    /** 최근 등록 순 */
     @Transaction
-    @Query("SELECT * FROM `plan`")
+    @Query("SELECT * FROM `plan` ORDER BY created_at DESC")
     abstract fun observePlans(): Flow<List<PlanWithDetails>>
+
+    /** 즐겨찾기한 계획만, 최근 등록 순 */
+    @Transaction
+    @Query("SELECT * FROM `plan` WHERE is_favorite = 1 ORDER BY created_at DESC")
+    abstract fun observeFavoritePlans(): Flow<List<PlanWithDetails>>
+
+    @Query("SELECT COUNT(*) FROM `plan`")
+    abstract suspend fun countPlans(): Int
+
+    @Query("UPDATE `plan` SET is_favorite = :favorite WHERE plan_id = :planId")
+    abstract suspend fun setFavorite(planId: String, favorite: Boolean)
 
     /** 짐·카시트는 CASCADE로 함께 삭제 */
     @Query("DELETE FROM `plan` WHERE plan_id = :planId")

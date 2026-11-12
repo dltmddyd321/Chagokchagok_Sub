@@ -16,7 +16,7 @@ import androidx.room.PrimaryKey
             childColumns = ["vehicle_id"],
         ),
     ],
-    indices = [Index("vehicle_id")],
+    indices = [Index("vehicle_id"), Index("created_at")],
 )
 data class PlanEntity(
     @PrimaryKey
@@ -29,4 +29,17 @@ data class PlanEntity(
     val passengerCount: Int,
     /** 사용자 메모 (없으면 null) */
     val memo: String? = null,
+    /** 계획 이름 (예: "주말 나들이") */
+    val name: String = "",
+    /** 분류. 정하지 않았으면 null */
+    val category: PlanCategory? = null,
+    /** 출발 날짜 "yyyy-MM-dd" (D-day 표시용). 정하지 않았으면 null */
+    @ColumnInfo(name = "trip_date")
+    val tripDate: String? = null,
+    /** 즐겨찾기 — 홈 "자주 찾는 내 계획"에 노출 */
+    @ColumnInfo(name = "is_favorite")
+    val isFavorite: Boolean = false,
+    /** 등록 시각 (epoch ms) — 최근 등록 순 정렬 */
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis(),
 )
