@@ -27,4 +27,6 @@ data class PlanEntity(
     /** 동승 인원 (운전자 포함) */
     @ColumnInfo(name = "passenger_count")
     val passengerCount: Int,
+    /** 사용자 메모 (없으면 null) */
+    val memo: String? = null,
 )

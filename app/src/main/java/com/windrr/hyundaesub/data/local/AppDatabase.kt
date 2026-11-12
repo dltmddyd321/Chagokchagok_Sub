@@ -19,7 +19,7 @@ import com.windrr.hyundaesub.data.local.entity.VehicleEntity
         PlanItemEntity::class,
         PlanCarSeatEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,6 +38,8 @@ abstract class AppDatabase : RoomDatabase() {
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
                     .addCallback(SeedVehicles)
+                    // 출시 전이라 스키마가 바뀌면 기존 로컬 데이터는 버리고 새로 만든다
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { instance = it }
             }
@@ -46,7 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
 
 /** 1차 프로토타입 지원 차량 */
 object DefaultVehicles {
-    val AVANTE = VehicleEntity(vehicleId = "avante_cn8", name = "5인승 세단 · 아반떼")
+    val AVANTE = VehicleEntity(vehicleId = "avante_cn8", isMain = true, name = "아반떼", desc = "5인승 세단")
     val ALL = listOf(AVANTE)
 }
 
@@ -54,7 +56,10 @@ object DefaultVehicles {
 private object SeedVehicles : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         DefaultVehicles.ALL.forEach {
-            db.execSQL("INSERT OR IGNORE INTO vehicle (vehicle_id, name) VALUES (?, ?)", arrayOf(it.vehicleId, it.name))
+            db.execSQL(
+                "INSERT OR IGNORE INTO vehicle (vehicle_id, is_main, name, description) VALUES (?, ?, ?, ?)",
+                arrayOf(it.vehicleId, if (it.isMain) 1 else 0, it.name, it.desc),
+            )
         }
     }
 }
