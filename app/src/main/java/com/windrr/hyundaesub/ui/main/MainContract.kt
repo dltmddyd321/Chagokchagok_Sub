@@ -33,6 +33,9 @@ enum class MainRoute {
     /** 짐 선택 > 새 물건 추가: 측정 방법 안내 */
     NEW_ITEM_GUIDE,
 
+    /** AR 촬영 후 측정값 확인 / 직접 입력 */
+    ITEM_CONFIRM,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -52,6 +55,10 @@ data class MainUiState(
     val lastItemSource: ItemSource? = null,
     /** AR 측정에서 뒤로 갈 때 돌아갈 화면 */
     val measureReturnRoute: MainRoute = MainRoute.TABS,
+    /** 확인 화면에 채울 AR 측정값 (null = 직접 입력) */
+    val measuredSize: BoxSize? = null,
+    /** 확인 화면에 들어올 때마다 증가 — 확인 화면 ViewModel을 새로 만드는 키 */
+    val confirmId: Int = 0,
 )
 
 sealed interface MainIntent {
@@ -78,7 +85,7 @@ sealed interface MainIntent {
     /** 측정 안내 > AR 측정하기 → 전체 화면 AR 카메라 */
     data object StartArMeasure : MainIntent
 
-    /** 측정 안내 > 직접 입력하기 (시안 대기) */
+    /** 측정 안내 > 직접 입력하기 → 빈 확인 화면 */
     data object OpenManualInput : MainIntent
 
     /** 짐 선택 > 등록된 물건 불러오기 */
@@ -98,8 +105,14 @@ sealed interface MainIntent {
     /** AR 측정 화면에서 뒤로 */
     data object CloseMeasure : MainIntent
 
-    /** AR 측정 완료 → 짐 목록에 담고 짐 선택으로 */
+    /** AR 촬영 완료 → 측정값 확인 화면 */
     data class ItemMeasured(val size: BoxSize) : MainIntent
+
+    /** 확인 화면에서 뒤로 → 측정에서 왔으면 다시 촬영, 직접 입력이면 안내 화면 */
+    data object BackFromConfirm : MainIntent
+
+    /** 확인 화면에서 저장 → 짐 목록에 담고 짐 선택으로 */
+    data class ItemConfirmed(val item: PickedItem) : MainIntent
 
     /** 전체 화면에서 뒤로 → 탭 화면 */
     data object BackToTabs : MainIntent

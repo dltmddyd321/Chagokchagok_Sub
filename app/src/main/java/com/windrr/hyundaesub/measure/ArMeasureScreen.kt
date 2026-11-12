@@ -293,7 +293,7 @@ private fun guideMessage(state: MeasureUiState): String = when {
     state.step == MeasureStep.POINT_B -> "가로 끝 모서리에 맞추고 셔터를 누르세요"
     state.step == MeasureStep.POINT_C -> "세로 끝 모서리에 맞추고 셔터를 누르세요"
     state.step == MeasureStep.HEIGHT -> "가운데 원을 물건의 가장 높은 곳에 맞추고 셔터를 누르세요"
-    else -> "셔터를 누르면 짐 목록에 담겨요"
+    else -> "셔터를 누르면 측정값을 확인할 수 있어요"
 }
 
 @Composable
@@ -328,7 +328,7 @@ private fun ShutterButton(done: Boolean, enabled: Boolean, onClick: () -> Unit) 
                 .background(Color.White),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) Text(text = "담기", color = DoneText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            if (done) Text(text = "확인", color = DoneText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

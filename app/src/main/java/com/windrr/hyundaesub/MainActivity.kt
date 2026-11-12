@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.ui.item.ItemSelectScreen
+import com.windrr.hyundaesub.ui.item.confirm.ItemConfirmRoute
 import com.windrr.hyundaesub.ui.item.newitem.NewItemGuideScreen
 import com.windrr.hyundaesub.ui.item.saved.SavedItemsRoute
 import com.windrr.hyundaesub.ui.main.MainIntent
@@ -60,6 +61,12 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
                         onManualInput = { viewModel.onIntent(MainIntent.OpenManualInput) },
                         onStartAr = { viewModel.onIntent(MainIntent.StartArMeasure) },
+                    )
+                    MainRoute.ITEM_CONFIRM -> ItemConfirmRoute(
+                        measured = state.measuredSize,
+                        onBack = { viewModel.onIntent(MainIntent.BackFromConfirm) },
+                        onSaved = { viewModel.onIntent(MainIntent.ItemConfirmed(it)) },
+                        viewModel = viewModel(key = "confirm-${state.confirmId}"),
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },

@@ -1,15 +1,12 @@
 package com.windrr.hyundaesub.ui.main
 
 import androidx.lifecycle.ViewModel
-import com.windrr.hyundaesub.measure.BoxSize
-import com.windrr.hyundaesub.measure.MeasureGeometry
 import com.windrr.hyundaesub.ui.item.ItemSource
 import com.windrr.hyundaesub.ui.item.PickedItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import java.util.UUID
 
 class MainViewModel : ViewModel() {
 
@@ -43,8 +40,9 @@ class MainViewModel : ViewModel() {
             MainIntent.StartArMeasure -> _state.update {
                 it.copy(route = MainRoute.MEASURE, measureReturnRoute = MainRoute.NEW_ITEM_GUIDE)
             }
-            // TODO: 직접 입력 화면 시안 나오면 연결
-            MainIntent.OpenManualInput -> Unit
+            MainIntent.OpenManualInput -> _state.update {
+                it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = null, confirmId = it.confirmId + 1)
+            }
             MainIntent.OpenSavedItems -> _state.update {
                 it.copy(route = MainRoute.SAVED_ITEMS, lastItemSource = ItemSource.SAVED)
             }
@@ -61,34 +59,22 @@ class MainViewModel : ViewModel() {
                 it.copy(route = it.measureReturnRoute, measureReturnRoute = MainRoute.TABS)
             }
             is MainIntent.ItemMeasured -> _state.update {
-                val item = measuredItem(intent.size, it.pickedItems) ?: return@update it
+                it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = intent.size, confirmId = it.confirmId + 1)
+            }
+            MainIntent.BackFromConfirm -> _state.update {
+                it.copy(route = if (it.measuredSize != null) MainRoute.MEASURE else MainRoute.NEW_ITEM_GUIDE)
+            }
+            is MainIntent.ItemConfirmed -> _state.update {
                 it.copy(
                     route = MainRoute.ITEM_SELECT,
                     measureReturnRoute = MainRoute.TABS,
-                    pickedItems = it.pickedItems + item,
+                    measuredSize = null,
+                    pickedItems = it.pickedItems + intent.item,
                 )
             }
             MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
         }
-    }
-
-    /**
-     * AR 측정값(cm, 소수) → 짐. 판정용으로 여유를 더해 올림한 정수 cm를 쓴다.
-     * TODO: 이름 입력 시안 나오면 사용자가 정한 이름으로
-     */
-    private fun measuredItem(size: BoxSize, current: List<PickedItem>): PickedItem? {
-        val width = size.widthCm ?: return null
-        val depth = size.depthCm ?: return null
-        val height = size.heightCm ?: return null
-        val number = current.count { it.savedItemId == null } + 1
-        return PickedItem(
-            key = "measured-${UUID.randomUUID()}",
-            name = "측정한 물건 $number",
-            widthCm = MeasureGeometry.roundUpForFit(width).toInt(),
-            depthCm = MeasureGeometry.roundUpForFit(depth).toInt(),
-            heightCm = MeasureGeometry.roundUpForFit(height).toInt(),
-        )
     }
 
     /** 같은 물건을 다시 불러오면 수량을 새 값으로 덮어쓴다 */

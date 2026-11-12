@@ -48,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
 import com.windrr.hyundaesub.ui.component.FlowTopBar
+import com.windrr.hyundaesub.ui.component.QuantityStepper
 import com.windrr.hyundaesub.ui.item.PickedItem
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
@@ -259,51 +260,6 @@ private fun CheckBox(checked: Boolean) {
 }
 
 @Composable
-private fun QuantityStepper(
-    quantity: Int,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        StepperButton(text = "−", background = DecreaseBg, enabled = quantity > 1, onClick = onDecrease)
-        Text(
-            text = quantity.toString(),
-            color = ChagokTextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(50.dp),
-        )
-        StepperButton(text = "+", background = IncreaseBg, enabled = true, onClick = onIncrease)
-    }
-}
-
-@Composable
-private fun StepperButton(
-    text: String,
-    background: Color,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(shape)
-            .background(background)
-            .border(1.dp, StepperBorder, shape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            color = if (enabled) ChagokTextPrimary else ChagokTextSecondary.copy(alpha = 0.4f),
-            fontSize = 20.sp,
-        )
-    }
-}
-
-@Composable
 private fun EmptyMessage(title: String, body: String) {
     Column(
         modifier = Modifier
@@ -329,9 +285,6 @@ private val Placeholder = Color(0xFF8A90A0)
 private val ThumbnailTint = Color(0xFFDCE6FB)
 private val ThumbnailIcon = Color(0xFFB07A3E)
 private val UncheckedBorder = Color(0xFFB8BECB)
-private val DecreaseBg = Color(0xFFF4F4F5)
-private val IncreaseBg = Color(0xFFE8ECF4)
-private val StepperBorder = Color(0xFFE4E6EB)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "목록")
 @Composable
