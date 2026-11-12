@@ -9,9 +9,11 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.ui.main.MainIntent
+import com.windrr.hyundaesub.ui.main.MainRoute
 import com.windrr.hyundaesub.ui.main.MainScreen
 import com.windrr.hyundaesub.ui.main.MainViewModel
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
+import com.windrr.hyundaesub.ui.vehicle.VehicleSelectRoute
 
 class MainActivity : ComponentActivity() {
 
@@ -23,10 +25,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             HyundaeSubTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
-                if (state.isMeasuring) {
-                    ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.CloseMeasure) })
-                } else {
-                    MainScreen(state = state, onIntent = viewModel::onIntent)
+                when (state.route) {
+                    MainRoute.TABS -> MainScreen(state = state, onIntent = viewModel::onIntent)
+                    MainRoute.VEHICLE_SELECT -> VehicleSelectRoute(
+                        onBack = { viewModel.onIntent(MainIntent.BackToTabs) },
+                        onNext = { viewModel.onIntent(MainIntent.VehicleSelected(it)) },
+                    )
+                    MainRoute.MEASURE -> ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.BackToTabs) })
                 }
             }
         }

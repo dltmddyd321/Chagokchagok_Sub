@@ -74,7 +74,7 @@ fun HomeScreen(onIntent: (MainIntent) -> Unit) {
             fontSize = 16.sp,
         )
         Spacer(Modifier.height(28.dp))
-        HeroCard(onStartClick = { onIntent(MainIntent.OpenMeasure) })
+        HeroCard(onStartClick = { onIntent(MainIntent.StartLoadFlow) })
         Spacer(Modifier.height(16.dp))
         FrequentItemsCard(onClick = { onIntent(MainIntent.OpenFrequentItems) })
         Spacer(Modifier.height(BottomBarClearance))
@@ -110,7 +110,7 @@ private fun LogoRow() {
     }
 }
 
-/** "이 짐, 내 차에 다 실릴까?" 히어로 카드. 화살표 버튼 → 짐 등록(AR 측정) */
+/** "이 짐, 내 차에 다 실릴까?" 히어로 카드. 화살표 버튼 → 짐 등록 흐름(차량 선택) */
 @Composable
 private fun HeroCard(onStartClick: () -> Unit) {
     val shape = RoundedCornerShape(28.dp)
@@ -119,8 +119,7 @@ private fun HeroCard(onStartClick: () -> Unit) {
             .fillMaxWidth()
             .height(400.dp)
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(ChagokHeroTop, ChagokHeroBottom)))
-            .clickable(onClick = onStartClick),
+            .background(Brush.verticalGradient(listOf(ChagokHeroTop, ChagokHeroBottom))),
     ) {
         Column(modifier = Modifier.padding(start = 24.dp, top = 28.dp, end = 24.dp)) {
             Text(

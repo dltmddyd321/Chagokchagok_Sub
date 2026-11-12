@@ -19,7 +19,7 @@ import com.windrr.hyundaesub.data.local.entity.VehicleEntity
         PlanItemEntity::class,
         PlanCarSeatEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,9 +46,14 @@ abstract class AppDatabase : RoomDatabase() {
     }
 }
 
-/** 1차 프로토타입 지원 차량 */
+/** 1차 프로토타입은 이 차량 하나만 쓴다 */
 object DefaultVehicles {
-    val AVANTE = VehicleEntity(vehicleId = "avante_cn8", isMain = true, name = "아반떼", desc = "5인승 세단")
+    val AVANTE = VehicleEntity(
+        vehicleId = "avante_cn8",
+        isMain = true,
+        name = "더 뉴 아반떼 하이브리드",
+        desc = "5인승 SUV",
+    )
     val ALL = listOf(AVANTE)
 }
 

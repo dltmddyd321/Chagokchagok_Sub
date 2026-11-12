@@ -14,8 +14,12 @@ class MainViewModel : ViewModel() {
     fun onIntent(intent: MainIntent) {
         when (intent) {
             is MainIntent.SelectTab -> _state.update { it.copy(selectedTab = intent.tab) }
-            MainIntent.OpenMeasure -> _state.update { it.copy(isMeasuring = true) }
-            MainIntent.CloseMeasure -> _state.update { it.copy(isMeasuring = false) }
+            MainIntent.StartLoadFlow -> _state.update { it.copy(route = MainRoute.VEHICLE_SELECT) }
+            // TODO: 2·3단계 화면 시안 나오면 교체. 지금은 AR 측정으로 바로 연결
+            is MainIntent.VehicleSelected -> _state.update {
+                it.copy(selectedVehicleId = intent.vehicleId, route = MainRoute.MEASURE)
+            }
+            MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
         }
     }
