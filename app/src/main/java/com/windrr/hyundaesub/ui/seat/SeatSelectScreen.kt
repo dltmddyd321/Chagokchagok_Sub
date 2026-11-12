@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import com.windrr.hyundaesub.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,7 +58,11 @@ fun SeatSelectRoute(
     onBack: () -> Unit,
     onNext: (occupiedSeats: Set<SeatCode>) -> Unit,
     viewModel: SeatSelectViewModel = viewModel(),
+    /** true = 배치 실패 후 "탑승 인원 변경" (단계 점 없음, 문구·버튼 다름) */
+    reselect: Boolean = false,
+    initialSeats: Set<SeatCode> = emptySet(),
 ) {
+    LaunchedEffect(viewModel) { viewModel.start(initialSeats) }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
@@ -66,7 +74,7 @@ fun SeatSelectRoute(
     }
     BackHandler(onBack = onBack)
 
-    SeatSelectScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack)
+    SeatSelectScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack, reselect = reselect)
 }
 
 @Composable
@@ -74,6 +82,7 @@ fun SeatSelectScreen(
     state: SeatSelectUiState,
     onIntent: (SeatSelectIntent) -> Unit,
     onBack: () -> Unit,
+    reselect: Boolean = false,
 ) {
     Column(
         modifier = Modifier
@@ -83,10 +92,10 @@ fun SeatSelectScreen(
             .navigationBarsPadding(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            FlowTopBar(step = 0, onBack = onBack)
+            if (reselect) BackOnlyTopBar(onBack) else FlowTopBar(step = 0, onBack = onBack)
             Spacer(Modifier.height(40.dp))
             Text(
-                text = "탑승할 좌석을\n선택해 주세요",
+                text = if (reselect) "탑승할 좌석을\n다시 선택해 주세요" else "탑승할 좌석을\n선택해 주세요",
                 color = ChagokTextPrimary,
                 fontSize = 28.sp,
                 lineHeight = 38.sp,
@@ -114,8 +123,28 @@ fun SeatSelectScreen(
             Spacer(Modifier.height(20.dp))
             SelectedSeatSummary(count = state.selectedCount)
             Spacer(Modifier.weight(1f))
-            ChagokPrimaryButton(text = "다음", onClick = { onIntent(SeatSelectIntent.Next) })
+            ChagokPrimaryButton(
+                text = if (reselect) "선택 완료" else "다음",
+                onClick = { onIntent(SeatSelectIntent.Next) },
+            )
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun BackOnlyTopBar(onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+            Icon(
+                painter = painterResource(R.drawable.ic_arrow_back),
+                contentDescription = "뒤로",
+                tint = ChagokTextPrimary,
+            )
         }
     }
 }

@@ -19,6 +19,7 @@ import com.windrr.hyundaesub.ui.main.MainScreen
 import com.windrr.hyundaesub.ui.main.MainViewModel
 import com.windrr.hyundaesub.ui.result.ConditionChangeScreen
 import com.windrr.hyundaesub.ui.result.LayoutFailedScreen
+import com.windrr.hyundaesub.ui.result.RequiredItemsScreen
 import com.windrr.hyundaesub.ui.seat.SeatSelectRoute
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 import com.windrr.hyundaesub.ui.vehicle.VehicleSelectRoute
@@ -82,6 +83,19 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackToLayoutFailed) },
                         onToggle = { viewModel.onIntent(MainIntent.ToggleConditionChange(it)) },
                         onNext = { viewModel.onIntent(MainIntent.ConditionChangesDone) },
+                    )
+                    MainRoute.REQUIRED_ITEMS -> RequiredItemsScreen(
+                        items = state.pickedItems.filter { it.selected },
+                        onBack = { viewModel.onIntent(MainIntent.BackInConditionFlow) },
+                        onToggle = { viewModel.onIntent(MainIntent.ToggleRequiredItem(it)) },
+                        onDone = { viewModel.onIntent(MainIntent.RequiredItemsDone) },
+                    )
+                    MainRoute.SEAT_RESELECT -> SeatSelectRoute(
+                        onBack = { viewModel.onIntent(MainIntent.BackInConditionFlow) },
+                        onNext = { viewModel.onIntent(MainIntent.SeatsReselected(it)) },
+                        viewModel = viewModel(key = "seat-reselect-${state.seatReselectId}"),
+                        reselect = true,
+                        initialSeats = state.occupiedSeats,
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },

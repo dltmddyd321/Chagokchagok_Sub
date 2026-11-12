@@ -43,6 +43,12 @@ enum class MainRoute {
     /** 배치 실패 > 조건 변경 (짐 조정 / 탑승 인원 변경 선택) */
     CONDITION_CHANGE,
 
+    /** 조건 변경 > 꼭 가져갈 짐 체크 */
+    REQUIRED_ITEMS,
+
+    /** 조건 변경 > 탑승 좌석 다시 선택 */
+    SEAT_RESELECT,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -68,6 +74,8 @@ data class MainUiState(
     val confirmId: Int = 0,
     /** 배치 실패 후 바꾸기로 고른 조건 */
     val conditionChanges: Set<ConditionChange> = emptySet(),
+    /** 좌석 다시 선택에 들어올 때마다 증가 — 좌석 ViewModel을 새로 만드는 키 */
+    val seatReselectId: Int = 0,
 )
 
 sealed interface MainIntent {
@@ -121,8 +129,20 @@ sealed interface MainIntent {
 
     data class ToggleConditionChange(val change: ConditionChange) : MainIntent
 
-    /** 조건 변경 > 다음 (짐 조정 → 좌석 재선택 순, 다음 화면 작업 예정) */
+    /** 조건 변경 > 다음 (짐 조정 → 좌석 재선택 순) */
     data object ConditionChangesDone : MainIntent
+
+    /** 꼭 가져갈 짐 체크 토글 */
+    data class ToggleRequiredItem(val key: String) : MainIntent
+
+    /** 꼭 가져갈 짐 > 선택 완료 */
+    data object RequiredItemsDone : MainIntent
+
+    /** 좌석 다시 선택 > 선택 완료 → 다시 추천 */
+    data class SeatsReselected(val seats: Set<SeatCode>) : MainIntent
+
+    /** 꼭 가져갈 짐 / 좌석 다시 선택에서 뒤로 */
+    data object BackInConditionFlow : MainIntent
 
     /** 조건 변경에서 뒤로 → 실패 화면 */
     data object BackToLayoutFailed : MainIntent

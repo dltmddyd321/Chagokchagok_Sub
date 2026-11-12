@@ -27,14 +27,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.R
-import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokNavy
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
 import com.windrr.hyundaesub.ui.theme.ChagokTextSecondary
 
 /**
- * 물건 카드: 썸네일·이름·크기·체크박스 + 수량 조절. 체크 시 네이비 테두리.
- * 짐 선택 목록과 "내 물건 가져오기"에서 같이 쓴다.
+ * 물건 카드: 썸네일·이름·크기·체크박스 + 수량. 체크 시 네이비 테두리.
+ * 짐 선택 목록, "내 물건 가져오기", "꼭 가져갈 짐"에서 같이 쓴다.
+ * onDecrease·onIncrease가 null이면 수량 조절 없이 "N개"만 표시한다.
  */
 @Composable
 fun ItemCard(
@@ -43,8 +43,8 @@ fun ItemCard(
     checked: Boolean,
     quantity: Int,
     onToggle: () -> Unit,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
+    onDecrease: (() -> Unit)?,
+    onIncrease: (() -> Unit)?,
     modifier: Modifier = Modifier,
     maxQuantity: Int = Int.MAX_VALUE,
 ) {
@@ -54,7 +54,7 @@ fun ItemCard(
             .fillMaxWidth()
             .clip(shape)
             .background(Color.White)
-            .border(if (checked) 1.5.dp else 1.dp, if (checked) ChagokNavy else ChagokCardBorder, shape)
+            .border(1.5.dp, if (checked) ChagokNavy else Color.Transparent, shape)
             .clickable(onClick = onToggle)
             .padding(16.dp),
     ) {
@@ -79,14 +79,23 @@ fun ItemCard(
             }
             CheckBox(checked = checked)
         }
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "수량", color = ChagokTextSecondary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            QuantityStepper(
-                quantity = quantity,
-                onDecrease = onDecrease,
-                onIncrease = onIncrease,
-                maxQuantity = maxQuantity,
+        if (onDecrease != null && onIncrease != null) {
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "수량", color = ChagokTextSecondary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                QuantityStepper(
+                    quantity = quantity,
+                    onDecrease = onDecrease,
+                    onIncrease = onIncrease,
+                    maxQuantity = maxQuantity,
+                )
+            }
+        } else {
+            Text(
+                text = "${quantity}개",
+                color = ChagokTextSecondary,
+                fontSize = 13.sp,
+                modifier = Modifier.align(Alignment.End),
             )
         }
     }
@@ -121,12 +130,13 @@ private fun CheckBox(checked: Boolean) {
             modifier = Modifier.size(22.dp),
         )
     } else {
+        // 시안: 미선택은 회색 채움 사각형
         Box(
             modifier = Modifier
                 .padding(2.dp)
                 .size(18.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .border(1.5.dp, UncheckedBorder, RoundedCornerShape(3.dp)),
+                .background(UncheckedFill),
         )
     }
 }
@@ -136,4 +146,4 @@ fun sizeLabelOf(widthCm: Int, depthCm: Int, heightCm: Int): String = "$widthCm �
 
 private val ThumbnailTint = Color(0xFFDCE6FB)
 private val ThumbnailIcon = Color(0xFFB07A3E)
-private val UncheckedBorder = Color(0xFFB8BECB)
+private val UncheckedFill = Color(0xFFEDEEF1)

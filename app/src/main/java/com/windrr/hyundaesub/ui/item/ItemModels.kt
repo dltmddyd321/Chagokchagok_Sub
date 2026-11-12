@@ -19,6 +19,11 @@ data class PickedItem(
     val savedItemId: String? = null,
     /** 이번 배치 추천에 포함할지 (짐 선택 목록의 체크박스) */
     val selected: Boolean = true,
+    /**
+     * 꼭 가져가야 하는 짐인지 (배치 실패 후 "가져갈 짐 조정"에서 체크).
+     * 서버 required_quantity = required면 quantity, 아니면 0 → 못 실으면 이 짐부터 뺀다
+     */
+    val required: Boolean = false,
 ) {
     val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
 

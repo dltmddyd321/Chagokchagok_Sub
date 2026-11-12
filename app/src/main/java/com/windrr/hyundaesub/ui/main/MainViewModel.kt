@@ -3,6 +3,7 @@ package com.windrr.hyundaesub.ui.main
 import androidx.lifecycle.ViewModel
 import com.windrr.hyundaesub.ui.item.ItemSource
 import com.windrr.hyundaesub.ui.item.PickedItem
+import com.windrr.hyundaesub.ui.result.ConditionChange
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,8 +59,7 @@ class MainViewModel : ViewModel() {
             is MainIntent.DecreasePickedQuantity -> updatePicked(intent.key) {
                 it.copy(quantity = (it.quantity - 1).coerceAtLeast(1))
             }
-            // TODO: 계획 저장 + 서버 배치 계산 연결. 성공 화면 전이라 지금은 항상 실패 화면으로
-            MainIntent.ItemsDone -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
+            MainIntent.ItemsDone -> requestRecommendation()
             MainIntent.ChangeConditions -> _state.update {
                 it.copy(route = MainRoute.CONDITION_CHANGE, conditionChanges = emptySet())
             }
@@ -69,8 +69,29 @@ class MainViewModel : ViewModel() {
                     conditionChanges = if (intent.change in current) current - intent.change else current + intent.change,
                 )
             }
-            // TODO: 꼭 가져갈 짐 선택 → (탑승 인원 변경도 골랐으면) 좌석 재선택 → 다시 추천
-            MainIntent.ConditionChangesDone -> Unit
+            MainIntent.ConditionChangesDone -> {
+                val changes = _state.value.conditionChanges
+                when {
+                    ConditionChange.ITEMS in changes -> _state.update { it.copy(route = MainRoute.REQUIRED_ITEMS) }
+                    ConditionChange.PASSENGERS in changes -> openSeatReselect()
+                }
+            }
+            is MainIntent.ToggleRequiredItem -> updatePicked(intent.key) { it.copy(required = !it.required) }
+            MainIntent.RequiredItemsDone -> {
+                if (ConditionChange.PASSENGERS in _state.value.conditionChanges) openSeatReselect() else requestRecommendation()
+            }
+            is MainIntent.SeatsReselected -> {
+                _state.update { it.copy(occupiedSeats = intent.seats) }
+                requestRecommendation()
+            }
+            MainIntent.BackInConditionFlow -> _state.update {
+                val back = if (it.route == MainRoute.SEAT_RESELECT && ConditionChange.ITEMS in it.conditionChanges) {
+                    MainRoute.REQUIRED_ITEMS
+                } else {
+                    MainRoute.CONDITION_CHANGE
+                }
+                it.copy(route = back)
+            }
             MainIntent.BackToLayoutFailed -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
             MainIntent.CloseMeasure -> _state.update {
                 it.copy(route = it.measureReturnRoute, measureReturnRoute = MainRoute.TABS)
@@ -92,6 +113,18 @@ class MainViewModel : ViewModel() {
             MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
         }
+    }
+
+    private fun openSeatReselect() {
+        _state.update { it.copy(route = MainRoute.SEAT_RESELECT, seatReselectId = it.seatReselectId + 1) }
+    }
+
+    /**
+     * 배치 추천 요청. 체크한 짐(selected)만, 꼭 가져갈 짐은 required_quantity로 보낸다.
+     * TODO: 계획 저장 + 서버 배치 계산 연결. 성공 화면 전이라 지금은 항상 실패 화면으로
+     */
+    private fun requestRecommendation() {
+        _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
     }
 
     private fun updatePicked(key: String, transform: (PickedItem) -> PickedItem) {
