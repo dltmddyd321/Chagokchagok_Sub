@@ -34,14 +34,15 @@ class MainViewModel : ViewModel() {
             }
             MainIntent.BackToVehicleSelect -> _state.update { it.copy(route = MainRoute.VEHICLE_SELECT) }
             MainIntent.BackToSeatSelect -> _state.update { it.copy(route = MainRoute.SEAT_SELECT) }
-            // TODO: AR 측정 결과를 PickedItem으로 담는 연결 (측정 화면 MVI 전환 때)
             MainIntent.AddNewItem -> _state.update {
-                it.copy(
-                    route = MainRoute.MEASURE,
-                    lastItemSource = ItemSource.NEW,
-                    measureReturnRoute = MainRoute.ITEM_SELECT,
-                )
+                it.copy(route = MainRoute.NEW_ITEM_GUIDE, lastItemSource = ItemSource.NEW)
             }
+            // TODO: AR 측정 결과를 PickedItem으로 담는 연결 (측정 화면 MVI 전환 때)
+            MainIntent.StartArMeasure -> _state.update {
+                it.copy(route = MainRoute.MEASURE, measureReturnRoute = MainRoute.NEW_ITEM_GUIDE)
+            }
+            // TODO: 직접 입력 화면 시안 나오면 연결
+            MainIntent.OpenManualInput -> Unit
             MainIntent.OpenSavedItems -> _state.update {
                 it.copy(route = MainRoute.SAVED_ITEMS, lastItemSource = ItemSource.SAVED)
             }

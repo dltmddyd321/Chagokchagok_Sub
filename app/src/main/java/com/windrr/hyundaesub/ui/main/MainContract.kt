@@ -29,6 +29,9 @@ enum class MainRoute {
     /** 짐 선택 > 등록된 물건 불러오기 */
     SAVED_ITEMS,
 
+    /** 짐 선택 > 새 물건 추가: 측정 방법 안내 */
+    NEW_ITEM_GUIDE,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -68,8 +71,14 @@ sealed interface MainIntent {
     /** 짐 선택에서 뒤로 → 좌석 선택 */
     data object BackToSeatSelect : MainIntent
 
-    /** 짐 선택 > 새 물건 추가 (AR 측정) */
+    /** 짐 선택 > 새 물건 추가 → 측정 안내 */
     data object AddNewItem : MainIntent
+
+    /** 측정 안내 > AR 측정하기 → 전체 화면 AR 카메라 */
+    data object StartArMeasure : MainIntent
+
+    /** 측정 안내 > 직접 입력하기 (시안 대기) */
+    data object OpenManualInput : MainIntent
 
     /** 짐 선택 > 등록된 물건 불러오기 */
     data object OpenSavedItems : MainIntent

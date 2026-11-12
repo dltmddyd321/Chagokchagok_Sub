@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.ui.item.ItemSelectScreen
+import com.windrr.hyundaesub.ui.item.newitem.NewItemGuideScreen
 import com.windrr.hyundaesub.ui.item.saved.SavedItemsRoute
 import com.windrr.hyundaesub.ui.main.MainIntent
 import com.windrr.hyundaesub.ui.main.MainRoute
@@ -54,6 +55,11 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
                         onDone = { viewModel.onIntent(MainIntent.SavedItemsPicked(it)) },
                         viewModel = viewModel(key = "saved-${state.loadFlowId}"),
+                    )
+                    MainRoute.NEW_ITEM_GUIDE -> NewItemGuideScreen(
+                        onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
+                        onManualInput = { viewModel.onIntent(MainIntent.OpenManualInput) },
+                        onStartAr = { viewModel.onIntent(MainIntent.StartArMeasure) },
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(onBack = { viewModel.onIntent(MainIntent.CloseMeasure) })
                 }
