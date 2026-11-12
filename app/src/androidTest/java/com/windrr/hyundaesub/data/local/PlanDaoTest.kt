@@ -44,7 +44,7 @@ class PlanDaoTest {
 
         val saved = db.planDao().getPlan("plan-1")
         assertNotNull(saved)
-        assertEquals("5인승 세단 · 아반떼", saved!!.vehicle?.name)
+        assertEquals(DefaultVehicles.AVANTE.name, saved!!.vehicle?.name)
         assertEquals(3, saved.plan.passengerCount)
         assertEquals(listOf("캐리어 24인치", "캠핑 박스"), saved.items.map { it.name }.sorted().reversed())
         assertEquals(2, saved.items.first { it.itemId == "item-2" }.quantity)
@@ -76,7 +76,7 @@ class PlanDaoTest {
     fun fileDatabase_seedsDefaultVehicle() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val vehicle = AppDatabase.getInstance(context).vehicleDao().get("avante_cn8")
-        assertEquals("5인승 세단 · 아반떼", vehicle?.name)
+        assertEquals(DefaultVehicles.AVANTE.name, vehicle?.name)
     }
 
     private fun count(table: String): Int =

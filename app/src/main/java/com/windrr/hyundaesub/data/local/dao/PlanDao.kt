@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 abstract class PlanDao {
 
-    /** 계획 하나를 짐·카시트까지 통째로 저장. 같은 plan_id가 있으면 짐·카시트 목록을 새 값으로 교체 */
+    /**
+     * 계획 하나를 짐·카시트까지 통째로 저장. 같은 plan_id가 있으면 짐·카시트 목록을 새 값으로 교체.
+     * 입력이 바뀌면 예전 배치 결과는 맞지 않으므로 계산 결과도 함께 지운다.
+     */
     @Transaction
     open suspend fun savePlan(
         plan: PlanEntity,
@@ -22,6 +25,7 @@ abstract class PlanDao {
         carSeats: List<PlanCarSeatEntity>,
     ) {
         upsertPlan(plan)
+        deleteCalculations(plan.planId)
         deleteItems(plan.planId)
         deleteCarSeats(plan.planId)
         insertItems(items)
@@ -52,6 +56,9 @@ abstract class PlanDao {
 
     @Insert
     protected abstract suspend fun insertCarSeats(carSeats: List<PlanCarSeatEntity>)
+
+    @Query("DELETE FROM calculation WHERE plan_id = :planId")
+    protected abstract suspend fun deleteCalculations(planId: String)
 
     @Query("DELETE FROM plan_item WHERE plan_id = :planId")
     protected abstract suspend fun deleteItems(planId: String)
