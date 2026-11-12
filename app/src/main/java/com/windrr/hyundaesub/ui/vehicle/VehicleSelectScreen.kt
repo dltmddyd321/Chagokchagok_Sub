@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +34,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.data.local.entity.VehicleEntity
-import com.windrr.hyundaesub.ui.component.StepIndicator
+import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
+import com.windrr.hyundaesub.ui.component.FlowTopBar
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokNavy
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
@@ -79,26 +77,7 @@ fun VehicleSelectScreen(
             .navigationBarsPadding()
             .padding(horizontal = 20.dp),
     ) {
-        // 상단: 뒤로가기 + 단계 표시 (1/3)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 0.dp),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_arrow_back),
-                    contentDescription = "뒤로",
-                    tint = ChagokTextPrimary,
-                )
-            }
-            StepIndicator(current = 0, total = 3, modifier = Modifier.align(Alignment.Center))
-        }
+        FlowTopBar(step = 0, onBack = onBack)
 
         Spacer(Modifier.height(40.dp))
         Text(
@@ -122,20 +101,11 @@ fun VehicleSelectScreen(
         )
 
         Spacer(Modifier.weight(1f))
-        Button(
+        ChagokPrimaryButton(
+            text = "다음",
             onClick = { onIntent(VehicleSelectIntent.Next) },
             enabled = state.canProceed,
-            shape = RoundedCornerShape(percent = 50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = NextButtonColor,
-                contentColor = Color.White,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-        ) {
-            Text(text = "다음", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
+        )
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -220,7 +190,6 @@ private fun SelectableCard(
     }
 }
 
-private val NextButtonColor = Color(0xFF05082B)
 private val SelectedCardTint = Color(0xFFE6EDFB)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
