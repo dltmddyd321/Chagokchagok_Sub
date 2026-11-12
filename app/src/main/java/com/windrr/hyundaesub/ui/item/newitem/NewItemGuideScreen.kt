@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Path
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
+import com.windrr.hyundaesub.ui.component.ChagokSecondaryButton
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
@@ -87,17 +88,7 @@ fun NewItemGuideScreen(
         ArGuideCard()
 
         Spacer(Modifier.weight(1f))
-        Button(
-            onClick = onManualInput,
-            shape = RoundedCornerShape(percent = 50),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ChagokTextPrimary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .border(1.dp, ChagokCardBorder, RoundedCornerShape(percent = 50)),
-        ) {
-            Text(text = "직접 입력하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
+        ChagokSecondaryButton(text = "직접 입력하기", onClick = onManualInput)
         Spacer(Modifier.height(12.dp))
         ChagokPrimaryButton(text = "AR 측정하기", onClick = onStartAr)
         Spacer(Modifier.height(16.dp))

@@ -36,6 +36,9 @@ enum class MainRoute {
     /** AR 촬영 후 측정값 확인 / 직접 입력 */
     ITEM_CONFIRM,
 
+    /** 배치 추천 결과 없음 */
+    LAYOUT_FAILED,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -104,8 +107,11 @@ sealed interface MainIntent {
 
     data class DecreasePickedQuantity(val key: String) : MainIntent
 
-    /** 짐 배치 추천받기 (다음 단계 시안 대기) */
+    /** 짐 배치 추천받기 */
     data object ItemsDone : MainIntent
+
+    /** 배치 실패 화면 > 조건 변경하기 (다음 화면 작업 예정) */
+    data object ChangeConditions : MainIntent
 
     /** AR 측정 화면에서 뒤로 */
     data object CloseMeasure : MainIntent

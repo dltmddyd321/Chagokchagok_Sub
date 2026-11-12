@@ -58,8 +58,10 @@ class MainViewModel : ViewModel() {
             is MainIntent.DecreasePickedQuantity -> updatePicked(intent.key) {
                 it.copy(quantity = (it.quantity - 1).coerceAtLeast(1))
             }
-            // TODO: 다음 단계(배치 결과) 시안 나오면 연결
-            MainIntent.ItemsDone -> Unit
+            // TODO: 계획 저장 + 서버 배치 계산 연결. 성공 화면 전이라 지금은 항상 실패 화면으로
+            MainIntent.ItemsDone -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
+            // TODO: "모든 짐을 싣기 어려워요" 조건 선택 화면
+            MainIntent.ChangeConditions -> Unit
             MainIntent.CloseMeasure -> _state.update {
                 it.copy(route = it.measureReturnRoute, measureReturnRoute = MainRoute.TABS)
             }

@@ -17,6 +17,7 @@ import com.windrr.hyundaesub.ui.main.MainIntent
 import com.windrr.hyundaesub.ui.main.MainRoute
 import com.windrr.hyundaesub.ui.main.MainScreen
 import com.windrr.hyundaesub.ui.main.MainViewModel
+import com.windrr.hyundaesub.ui.result.LayoutFailedScreen
 import com.windrr.hyundaesub.ui.seat.SeatSelectRoute
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 import com.windrr.hyundaesub.ui.vehicle.VehicleSelectRoute
@@ -69,6 +70,11 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackFromConfirm) },
                         onSaved = { viewModel.onIntent(MainIntent.ItemConfirmed(it)) },
                         viewModel = viewModel(key = "confirm-${state.confirmId}"),
+                    )
+                    MainRoute.LAYOUT_FAILED -> LayoutFailedScreen(
+                        onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
+                        onNewPlan = { viewModel.onIntent(MainIntent.StartLoadFlow) },
+                        onChangeConditions = { viewModel.onIntent(MainIntent.ChangeConditions) },
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },

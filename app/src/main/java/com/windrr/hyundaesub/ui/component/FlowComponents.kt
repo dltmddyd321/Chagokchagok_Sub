@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.component
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.R
+import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
 
 /** 짐 등록 흐름 단계 점 수 (시안: 차량·좌석=0, 짐=1, 결과=2) */
@@ -65,6 +67,26 @@ fun ChagokPrimaryButton(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp),
+    ) {
+        Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** 흰 바탕 + 연한 테두리 알약 버튼 (보조 동작) */
+@Composable
+fun ChagokSecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(percent = 50),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ChagokTextPrimary),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .border(1.dp, ChagokCardBorder, RoundedCornerShape(percent = 50)),
     ) {
         Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
