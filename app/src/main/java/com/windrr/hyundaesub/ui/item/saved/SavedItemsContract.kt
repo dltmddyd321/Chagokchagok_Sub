@@ -1,9 +1,10 @@
 package com.windrr.hyundaesub.ui.item.saved
 
+import com.windrr.hyundaesub.data.local.dao.SavedItemDao
 import com.windrr.hyundaesub.ui.component.sizeLabelOf
 import com.windrr.hyundaesub.ui.item.PickedItem
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /** 사용자가 저장해 둔 물건 ("자주 싣는 짐") */
 data class SavedItem(
@@ -12,6 +13,8 @@ data class SavedItem(
     val widthCm: Int,
     val depthCm: Int,
     val heightCm: Int,
+    /** 불러올 때 기본 수량 */
+    val defaultQuantity: Int = 1,
 ) {
     val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
 }
@@ -21,9 +24,20 @@ fun interface SavedItemsSource {
     fun observeAll(): Flow<List<SavedItem>>
 }
 
-/** TODO: saved_item 테이블 생기기 전까지 빈 목록 */
-object EmptySavedItemsSource : SavedItemsSource {
-    override fun observeAll(): Flow<List<SavedItem>> = flowOf(emptyList())
+/** 내 짐 테이블(saved_item)에서 최근 등록 순으로 */
+class RoomSavedItemsSource(private val dao: SavedItemDao) : SavedItemsSource {
+    override fun observeAll(): Flow<List<SavedItem>> = dao.observeAll().map { list ->
+        list.map {
+            SavedItem(
+                id = it.savedItemId,
+                name = it.name,
+                widthCm = it.widthCm,
+                depthCm = it.depthCm,
+                heightCm = it.heightCm,
+                defaultQuantity = it.defaultQuantity,
+            )
+        }
+    }
 }
 
 data class SavedItemsUiState(
@@ -32,7 +46,7 @@ data class SavedItemsUiState(
     val allItems: List<SavedItem> = emptyList(),
     /** 체크한 물건 id */
     val selectedIds: Set<String> = emptySet(),
-    /** 물건별 수량 (없으면 1) */
+    /** 물건별로 바꾼 수량 (없으면 그 물건의 기본 수량) */
     val quantities: Map<String, Int> = emptyMap(),
 ) {
     val visibleItems: List<SavedItem>
@@ -45,7 +59,8 @@ data class SavedItemsUiState(
 
     val canSave: Boolean get() = selectedIds.isNotEmpty()
 
-    fun quantityOf(id: String): Int = quantities[id] ?: 1
+    fun quantityOf(id: String): Int =
+        quantities[id] ?: allItems.firstOrNull { it.id == id }?.defaultQuantity ?: 1
 }
 
 sealed interface SavedItemsIntent {

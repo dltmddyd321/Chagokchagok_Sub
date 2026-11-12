@@ -1,6 +1,10 @@
 package com.windrr.hyundaesub.ui.item.confirm
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.windrr.hyundaesub.data.local.AppDatabase
+import com.windrr.hyundaesub.data.local.entity.DimensionSource
+import com.windrr.hyundaesub.data.local.entity.SavedItemEntity
 import androidx.lifecycle.viewModelScope
 import com.windrr.hyundaesub.measure.BoxSize
 import com.windrr.hyundaesub.ui.item.PickedItem
@@ -13,7 +17,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-class ItemConfirmViewModel : ViewModel() {
+/** 측정값 확인 / 직접 입력. 저장하면 내 짐(saved_item)에 등록하고 이번 계획 짐으로도 담는다 */
+class ItemConfirmViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val savedItemDao = AppDatabase.getInstance(application).savedItemDao()
 
     private val _state = MutableStateFlow(ItemConfirmUiState())
     val state: StateFlow<ItemConfirmUiState> = _state.asStateFlow()
@@ -22,6 +29,9 @@ class ItemConfirmViewModel : ViewModel() {
     val effect = _effect.receiveAsFlow()
 
     private var started = false
+
+    /** 저장하기 연타로 같은 짐이 두 번 등록되지 않게 */
+    private var saving = false
 
     /** 화면 진입 시 한 번만: 측정값(없으면 직접 입력)으로 채운다 */
     fun start(measured: BoxSize?) {
@@ -54,16 +64,30 @@ class ItemConfirmViewModel : ViewModel() {
 
     private fun save() {
         val s = _state.value
-        if (!s.canSave) return
-        val item = PickedItem(
-            key = "new-${UUID.randomUUID()}",
+        if (!s.canSave || saving) return
+        saving = true
+        val saved = SavedItemEntity(
+            savedItemId = UUID.randomUUID().toString(),
             name = s.name.trim(),
             widthCm = s.widthCm!!,
             depthCm = s.depthCm!!,
             heightCm = s.heightCm!!,
-            quantity = s.quantity,
+            defaultQuantity = s.quantity,
+            dimensionSource = if (s.fromMeasure) DimensionSource.AR else DimensionSource.MANUAL,
         )
-        viewModelScope.launch { _effect.send(ItemConfirmEffect.Saved(item)) }
+        val item = PickedItem(
+            key = "saved-${saved.savedItemId}",
+            name = saved.name,
+            widthCm = saved.widthCm,
+            depthCm = saved.depthCm,
+            heightCm = saved.heightCm,
+            quantity = s.quantity,
+            savedItemId = saved.savedItemId,
+        )
+        viewModelScope.launch {
+            savedItemDao.upsert(saved)
+            _effect.send(ItemConfirmEffect.Saved(item))
+        }
     }
 
     private companion object {

@@ -4,22 +4,25 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import com.windrr.hyundaesub.data.local.AppDatabase
 import com.windrr.hyundaesub.data.local.DefaultVehicles
+import com.windrr.hyundaesub.data.local.entity.DimensionSource
 import com.windrr.hyundaesub.data.local.entity.PlanCarSeatEntity
 import com.windrr.hyundaesub.data.local.entity.PlanCategory
 import com.windrr.hyundaesub.data.local.entity.PlanEntity
 import com.windrr.hyundaesub.data.local.entity.PlanItemEntity
+import com.windrr.hyundaesub.data.local.entity.SavedItemEntity
 import com.windrr.hyundaesub.data.local.entity.SeatCode
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
- * 홈 화면 확인용 더미 계획 (디버그 빌드에서만, 앱 설치 후 최초 1회).
+ * 화면 확인용 더미 계획·내 짐 (디버그 빌드에서만, DB 스키마 버전마다 최초 1회).
+ * 스키마가 바뀌면 DB가 새로 만들어지므로 버전별로 다시 넣는다.
  * 계획 저장 흐름이 연결되면 제거하거나 꺼도 된다.
  */
 object DummyPlans {
 
     private const val PREFS = "dummy_data"
-    private const val KEY_SEEDED = "plans_seeded_v1"
+    private const val KEY_SEEDED = "seeded_db_v${AppDatabase.VERSION}"
 
     suspend fun seedIfNeeded(context: Context, db: AppDatabase) {
         val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -31,7 +34,46 @@ object DummyPlans {
             db.vehicleDao().upsert(*DefaultVehicles.ALL.toTypedArray())
             plans().forEach { db.planDao().savePlan(it.plan, it.items, it.carSeats) }
         }
+        if (db.savedItemDao().count() == 0) {
+            db.savedItemDao().upsert(*savedItems().toTypedArray())
+        }
         prefs.edit().putBoolean(KEY_SEEDED, true).apply()
+    }
+
+    /** 내 물건 가져오기 시안의 캠핑박스 + 서버 예시의 캠핑 의자 */
+    private fun savedItems(): List<SavedItemEntity> {
+        val now = System.currentTimeMillis()
+        fun minutesAgo(m: Long) = now - TimeUnit.MINUTES.toMillis(m)
+        return listOf(
+            SavedItemEntity(
+                savedItemId = "dummy-saved-box-l",
+                name = "캠핑박스 L",
+                widthCm = 60,
+                depthCm = 40,
+                heightCm = 35,
+                dimensionSource = DimensionSource.MANUAL,
+                createdAt = minutesAgo(1),
+            ),
+            SavedItemEntity(
+                savedItemId = "dummy-saved-box-s",
+                name = "캠핑박스 S",
+                widthCm = 50,
+                depthCm = 40,
+                heightCm = 40,
+                dimensionSource = DimensionSource.MANUAL,
+                createdAt = minutesAgo(2),
+            ),
+            SavedItemEntity(
+                savedItemId = "dummy-saved-chair",
+                name = "캠핑 의자",
+                widthCm = 20,
+                depthCm = 20,
+                heightCm = 60,
+                defaultQuantity = 2,
+                dimensionSource = DimensionSource.AR,
+                createdAt = minutesAgo(3),
+            ),
+        )
     }
 
     private class Dummy(

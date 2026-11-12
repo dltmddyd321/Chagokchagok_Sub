@@ -1,6 +1,8 @@
 package com.windrr.hyundaesub.ui.item.saved
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.windrr.hyundaesub.data.local.AppDatabase
 import androidx.lifecycle.viewModelScope
 import com.windrr.hyundaesub.ui.item.PickedItem
 import kotlinx.coroutines.channels.Channel
@@ -11,9 +13,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class SavedItemsViewModel(
-    source: SavedItemsSource = EmptySavedItemsSource,
-) : ViewModel() {
+class SavedItemsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val source: SavedItemsSource = RoomSavedItemsSource(AppDatabase.getInstance(application).savedItemDao())
 
     private val _state = MutableStateFlow(SavedItemsUiState())
     val state: StateFlow<SavedItemsUiState> = _state.asStateFlow()
