@@ -17,6 +17,7 @@ import com.windrr.hyundaesub.ui.main.MainIntent
 import com.windrr.hyundaesub.ui.main.MainRoute
 import com.windrr.hyundaesub.ui.main.MainScreen
 import com.windrr.hyundaesub.ui.main.MainViewModel
+import com.windrr.hyundaesub.ui.result.ConditionChangeScreen
 import com.windrr.hyundaesub.ui.result.LayoutFailedScreen
 import com.windrr.hyundaesub.ui.seat.SeatSelectRoute
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
@@ -75,6 +76,12 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
                         onNewPlan = { viewModel.onIntent(MainIntent.StartLoadFlow) },
                         onChangeConditions = { viewModel.onIntent(MainIntent.ChangeConditions) },
+                    )
+                    MainRoute.CONDITION_CHANGE -> ConditionChangeScreen(
+                        selected = state.conditionChanges,
+                        onBack = { viewModel.onIntent(MainIntent.BackToLayoutFailed) },
+                        onToggle = { viewModel.onIntent(MainIntent.ToggleConditionChange(it)) },
+                        onNext = { viewModel.onIntent(MainIntent.ConditionChangesDone) },
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },

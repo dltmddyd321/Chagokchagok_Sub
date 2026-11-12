@@ -6,6 +6,7 @@ import com.windrr.hyundaesub.data.local.entity.SeatCode
 import com.windrr.hyundaesub.measure.BoxSize
 import com.windrr.hyundaesub.ui.item.ItemSource
 import com.windrr.hyundaesub.ui.item.PickedItem
+import com.windrr.hyundaesub.ui.result.ConditionChange
 
 enum class MainTab(val label: String, @DrawableRes val iconRes: Int) {
     HOME("홈", R.drawable.ic_tab_home),
@@ -39,6 +40,9 @@ enum class MainRoute {
     /** 배치 추천 결과 없음 */
     LAYOUT_FAILED,
 
+    /** 배치 실패 > 조건 변경 (짐 조정 / 탑승 인원 변경 선택) */
+    CONDITION_CHANGE,
+
     /** AR 크기 측정 */
     MEASURE,
 }
@@ -62,6 +66,8 @@ data class MainUiState(
     val measuredSize: BoxSize? = null,
     /** 확인 화면에 들어올 때마다 증가 — 확인 화면 ViewModel을 새로 만드는 키 */
     val confirmId: Int = 0,
+    /** 배치 실패 후 바꾸기로 고른 조건 */
+    val conditionChanges: Set<ConditionChange> = emptySet(),
 )
 
 sealed interface MainIntent {
@@ -110,8 +116,16 @@ sealed interface MainIntent {
     /** 짐 배치 추천받기 */
     data object ItemsDone : MainIntent
 
-    /** 배치 실패 화면 > 조건 변경하기 (다음 화면 작업 예정) */
+    /** 배치 실패 화면 > 조건 변경하기 */
     data object ChangeConditions : MainIntent
+
+    data class ToggleConditionChange(val change: ConditionChange) : MainIntent
+
+    /** 조건 변경 > 다음 (짐 조정 → 좌석 재선택 순, 다음 화면 작업 예정) */
+    data object ConditionChangesDone : MainIntent
+
+    /** 조건 변경에서 뒤로 → 실패 화면 */
+    data object BackToLayoutFailed : MainIntent
 
     /** AR 측정 화면에서 뒤로 */
     data object CloseMeasure : MainIntent

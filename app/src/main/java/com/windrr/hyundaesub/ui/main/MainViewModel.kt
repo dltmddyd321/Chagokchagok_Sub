@@ -60,8 +60,18 @@ class MainViewModel : ViewModel() {
             }
             // TODO: 계획 저장 + 서버 배치 계산 연결. 성공 화면 전이라 지금은 항상 실패 화면으로
             MainIntent.ItemsDone -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
-            // TODO: "모든 짐을 싣기 어려워요" 조건 선택 화면
-            MainIntent.ChangeConditions -> Unit
+            MainIntent.ChangeConditions -> _state.update {
+                it.copy(route = MainRoute.CONDITION_CHANGE, conditionChanges = emptySet())
+            }
+            is MainIntent.ToggleConditionChange -> _state.update {
+                val current = it.conditionChanges
+                it.copy(
+                    conditionChanges = if (intent.change in current) current - intent.change else current + intent.change,
+                )
+            }
+            // TODO: 꼭 가져갈 짐 선택 → (탑승 인원 변경도 골랐으면) 좌석 재선택 → 다시 추천
+            MainIntent.ConditionChangesDone -> Unit
+            MainIntent.BackToLayoutFailed -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
             MainIntent.CloseMeasure -> _state.update {
                 it.copy(route = it.measureReturnRoute, measureReturnRoute = MainRoute.TABS)
             }
