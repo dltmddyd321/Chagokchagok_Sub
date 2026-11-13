@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     )
                     MainRoute.ITEM_CONFIRM -> ItemConfirmRoute(
                         measured = state.measuredSize,
+                        photoUri = state.measuredPhotoUri,
                         onBack = { viewModel.onIntent(MainIntent.BackFromConfirm) },
                         onSaved = { viewModel.onIntent(MainIntent.ItemConfirmed(it)) },
                         viewModel = viewModel(key = "confirm-${state.confirmId}"),
@@ -106,7 +107,7 @@ class MainActivity : ComponentActivity() {
                     )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },
-                        onMeasured = { viewModel.onIntent(MainIntent.ItemMeasured(it)) },
+                        onMeasured = { size, photo -> viewModel.onIntent(MainIntent.ItemMeasured(size, photo)) },
                         shape = state.measureShape,
                     )
                 }

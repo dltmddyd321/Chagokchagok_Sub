@@ -1,6 +1,14 @@
 package com.windrr.hyundaesub.measure
 
 import android.Manifest
+import androidx.compose.foundation.border
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import java.io.File
+import android.net.Uri
+import android.graphics.Bitmap
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.opengl.GLSurfaceView
@@ -90,13 +98,15 @@ import kotlinx.coroutines.delay
 
 /**
  * 전체 화면 AR 측정 (삼성 간편 측정과 같은 방식).
- * 가운데 조준 링을 카메라로 움직여 맞추고 + → 시작점, 다시 + → 끝점. 선을 여러 개 잴 수 있다.
- * 확인을 누르면 잰 순서대로 첫 선 = 가로, 둘째 = 세로, 셋째 = 높이로 [onMeasured]에 넘긴다 (확인 화면에서 고칠 수 있음).
+ * - 가운데 = 크기 측정 버튼: 조준 링을 맞추고 누르면 시작점, 다시 누르면 끝점 (선 하나)
+ * - 오른쪽 = 일반 사진 촬영 (측정 선·버튼 없이 카메라 화면만)
+ * 크기 측정으로 필요한 선(네모 = 가로·세로·높이 3개, 둥근 = 지름·높이 2개)을 다 재면 바로 다음 화면으로 넘어가고,
+ * [onMeasured]로 치수와 가장 마지막에 찍은 사진(없으면 null)을 넘긴다.
  */
 @Composable
 fun ArMeasureScreen(
     onBack: () -> Unit,
-    onMeasured: (BoxSize) -> Unit,
+    onMeasured: (size: BoxSize, photoUri: String?) -> Unit,
     shape: MeasureShape = MeasureShape.BOX,
 ) {
     val context = LocalContext.current
@@ -121,7 +131,11 @@ fun ArMeasureScreen(
 }
 
 @Composable
-private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, shape: MeasureShape) {
+private fun ArMeasureContent(
+    onBack: () -> Unit,
+    onMeasured: (size: BoxSize, photoUri: String?) -> Unit,
+    shape: MeasureShape,
+) {
     val context = LocalContext.current
     val activity = context as Activity
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -249,6 +263,38 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
     }
     val scanning = !uiState.tracking || (!uiState.surfaceFound && pointCount == 0)
 
+    // 가장 마지막에 찍은 사진 (다음 화면으로 넘긴다)
+    var lastPhotoUri by remember { mutableStateOf<String?>(null) }
+    var flash by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val takePhoto: () -> Unit = {
+        renderer?.capturePhoto { bitmap ->
+            scope.launch {
+                lastPhotoUri = withContext(Dispatchers.IO) { savePhoto(context, bitmap) }
+                toast = "사진을 찍었어요."
+                toastKey++
+            }
+        }
+        flash = true
+    }
+    LaunchedEffect(flash) {
+        if (flash) {
+            delay(120)
+            flash = false
+        }
+    }
+
+    // 크기 측정 버튼으로 필요한 선을 다 재면 다음 화면으로
+    val needed = if (shape == MeasureShape.CYLINDER) 2 else 3
+    LaunchedEffect(uiState.lengthsCm.size, uiState.waitingEnd) {
+        val l = uiState.lengthsCm
+        if (!uiState.waitingEnd && l.size >= needed) {
+            delay(400) // 마지막 선이 그려지는 걸 잠깐 보여주고
+            val size = if (shape == MeasureShape.CYLINDER) BoxSize(l[0], l[0], l[1]) else BoxSize(l[0], l[1], l[2])
+            onMeasured(size, lastPhotoUri)
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -308,6 +354,14 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
             )
         }
 
+        if (flash) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.6f)),
+            )
+        }
+
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -351,17 +405,16 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                     onClick = { renderer?.undo() },
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
-                AddPointButton(
+                // 가운데: 크기 측정 (시작점·끝점 찍기)
+                MeasureButton(
                     enabled = !scanning && (uiState.aimDistanceCm != null),
                     onClick = { renderer?.captureAtAim() },
                     modifier = Modifier.align(Alignment.Center),
                 )
-                ConfirmButton(
-                    enabled = uiState.lengthsCm.isNotEmpty() && !uiState.waitingEnd,
-                    onClick = {
-                        val l = uiState.lengthsCm
-                        onMeasured(BoxSize(l.getOrNull(0), l.getOrNull(1), l.getOrNull(2)))
-                    },
+                // 오른쪽: 일반 사진 촬영
+                PhotoButton(
+                    enabled = renderer != null && uiState.tracking,
+                    onClick = takePhoto,
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
             }
@@ -377,7 +430,7 @@ private fun DimensionHint(measuredCount: Int, shape: MeasureShape, modifier: Mod
         shape == MeasureShape.CYLINDER && measuredCount == 0 -> "먼저 지름을 재 주세요"
         shape == MeasureShape.CYLINDER && measuredCount == 1 -> "이어서 높이를 재 주세요 (지름은 가로·세로에 같이 들어가요)"
         measuredCount < 3 -> "${names[measuredCount]}를 재 주세요 (${measuredCount + 1}/3)"
-        else -> "확인을 누르면 수치를 확인할 수 있어요"
+        else -> "측정이 끝났어요"
     }
     Text(
         text = text,
@@ -455,43 +508,61 @@ private fun RoundIconButton(text: String, enabled: Boolean, onClick: () -> Unit,
     }
 }
 
-/** "+" 버튼: 조준 링 위치에 시작점·끝점 찍기 */
+/** 가운데 크기 측정 버튼: 반투명 원 + 흰 테두리 + "+" (시안) */
 @Composable
-private fun AddPointButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun MeasureButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(64.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .size(60.dp)
+            .alpha(if (enabled) 1f else 0.45f)
             .clip(CircleShape)
-            .background(Color.White)
+            .background(Color.White.copy(alpha = 0.25f))
+            .border(2.5.dp, Color.White, CircleShape)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = "+", color = DarkText, fontSize = 36.sp, fontWeight = FontWeight.Light)
+        Text(text = "+", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Light)
     }
 }
 
-/** ○ 확인: 잰 선이 있으면 활성 */
+/** 오른쪽 사진 촬영 버튼: 흰 테두리 안 흰 원 (시안) */
 @Composable
-private fun ConfirmButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun PhotoButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(52.dp)
-            .alpha(if (enabled) 1f else 0.5f)
+            .alpha(if (enabled) 1f else 0.45f)
             .clip(CircleShape)
-            .background(if (enabled) Color.White else Color.Transparent)
+            .border(2.dp, Color.White, CircleShape)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (enabled) {
-            Text(text = "확인", color = DarkText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        } else {
-            Canvas(Modifier.size(52.dp)) {
-                drawCircle(Color.White, radius = size.minDimension / 2f - 1.5.dp.toPx(), style = Stroke(2.dp.toPx()))
-            }
-        }
+        Box(
+            Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color.White),
+        )
     }
 }
+
+/** 찍은 사진을 앱 캐시에 JPEG로 저장하고 file URI를 돌려준다 (긴 변 1440px로 줄임) */
+private fun savePhoto(context: android.content.Context, bitmap: Bitmap): String? = runCatching {
+    val scale = PHOTO_MAX_SIDE.toFloat() / maxOf(bitmap.width, bitmap.height)
+    val scaled = if (scale < 1f) {
+        Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+    } else {
+        bitmap
+    }
+    val dir = File(context.cacheDir, "ar_photos").apply { mkdirs() }
+    val file = File(dir, "photo_${System.currentTimeMillis()}.jpg")
+    file.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+    if (scaled !== bitmap) scaled.recycle()
+    bitmap.recycle()
+    Uri.fromFile(file).toString()
+}.getOrNull()
+
+private const val PHOTO_MAX_SIDE = 1440
 
 /** 조준 링: 표면 방향으로 누운 흰 원 + 가운데 점. 기존 점에 달라붙으면 노란색 */
 private fun DrawScope.drawAimRing(state: MeasureUiState) {

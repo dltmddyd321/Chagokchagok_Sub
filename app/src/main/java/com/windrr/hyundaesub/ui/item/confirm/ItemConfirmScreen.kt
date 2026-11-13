@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
@@ -81,11 +82,13 @@ import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 @Composable
 fun ItemConfirmRoute(
     measured: BoxSize?,
+    /** AR 측정 때 마지막으로 찍은 사진 */
+    photoUri: String?,
     onBack: () -> Unit,
     onSaved: (PickedItem) -> Unit,
     viewModel: ItemConfirmViewModel = viewModel(),
 ) {
-    LaunchedEffect(viewModel) { viewModel.start(measured) }
+    LaunchedEffect(viewModel) { viewModel.start(measured, photoUri) }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
@@ -312,6 +315,8 @@ private fun PhotoRow(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // 찍은 사진이 없으면 기본 이미지
+        if (photos.isEmpty()) DefaultPhotoThumb()
         photos.forEach { uri -> PhotoThumb(uri = uri, onRemove = { onRemove(uri) }) }
         if (canAdd) {
             Column(
@@ -375,6 +380,27 @@ private fun PhotoThumb(uri: String, onRemove: () -> Unit) {
     }
 }
 
+/** 사진이 없을 때 기본 이미지 (임시: 짐 아이콘. 기본 이미지 에셋 받으면 교체) */
+@Composable
+private fun DefaultPhotoThumb() {
+    Box(
+        modifier = Modifier
+            .size(PhotoSize)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brush.linearGradient(listOf(Color.White, DefaultPhotoTint))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_tab_luggage),
+            contentDescription = "기본 이미지",
+            tint = DefaultPhotoIcon,
+            modifier = Modifier.size(40.dp),
+        )
+    }
+}
+
+private val DefaultPhotoTint = Color(0xFFDCE6FB)
+private val DefaultPhotoIcon = Color(0xFF8FA3C8)
 private val PhotoSize = 96.dp
 private val RemoveBadge = Color(0xCC2A3550)
 private val SecondaryButtonBg = Color(0xFFDDE3EE)

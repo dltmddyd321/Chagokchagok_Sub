@@ -74,6 +74,8 @@ data class MainUiState(
     val measureReturnRoute: MainRoute = MainRoute.TABS,
     /** 확인 화면에 채울 AR 측정값 (null = 직접 입력) */
     val measuredSize: BoxSize? = null,
+    /** AR 측정 중 가장 마지막에 찍은 사진 (없으면 null → 확인 화면에 기본 이미지) */
+    val measuredPhotoUri: String? = null,
     /** AR 측정 방식 (바닥 모양) */
     val measureShape: MeasureShape = MeasureShape.BOX,
     /** 확인 화면에 들어올 때마다 증가 — 확인 화면 ViewModel을 새로 만드는 키 */
@@ -165,7 +167,7 @@ sealed interface MainIntent {
     data object CloseMeasure : MainIntent
 
     /** AR 촬영 완료 → 측정값 확인 화면 */
-    data class ItemMeasured(val size: BoxSize) : MainIntent
+    data class ItemMeasured(val size: BoxSize, val photoUri: String?) : MainIntent
 
     /** 확인 화면에서 뒤로 → 측정에서 왔으면 다시 촬영, 직접 입력이면 안내 화면 */
     data object BackFromConfirm : MainIntent

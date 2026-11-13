@@ -45,7 +45,7 @@ class MainViewModel : ViewModel() {
             }
             MainIntent.BackFromShapeSelect -> _state.update { it.copy(route = MainRoute.NEW_ITEM_GUIDE) }
             MainIntent.OpenManualInput -> _state.update {
-                it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = null, confirmId = it.confirmId + 1)
+                it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = null, measuredPhotoUri = null, confirmId = it.confirmId + 1)
             }
             MainIntent.OpenSavedItems -> _state.update {
                 it.copy(route = MainRoute.SAVED_ITEMS, lastItemSource = ItemSource.SAVED)
@@ -100,7 +100,12 @@ class MainViewModel : ViewModel() {
                 it.copy(route = it.measureReturnRoute, measureReturnRoute = MainRoute.TABS)
             }
             is MainIntent.ItemMeasured -> _state.update {
-                it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = intent.size, confirmId = it.confirmId + 1)
+                it.copy(
+                    route = MainRoute.ITEM_CONFIRM,
+                    measuredSize = intent.size,
+                    measuredPhotoUri = intent.photoUri,
+                    confirmId = it.confirmId + 1,
+                )
             }
             MainIntent.BackFromConfirm -> _state.update {
                 it.copy(route = if (it.measuredSize != null) MainRoute.MEASURE else MainRoute.NEW_ITEM_GUIDE)

@@ -34,10 +34,10 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
     private var saving = false
 
     /** 화면 진입 시 한 번만: 측정값(없으면 직접 입력)으로 채운다 */
-    fun start(measured: BoxSize?) {
+    fun start(measured: BoxSize?, photoUri: String? = null) {
         if (started) return
         started = true
-        _state.value = ItemConfirmUiState.fromMeasure(measured)
+        _state.value = ItemConfirmUiState.fromMeasure(measured).copy(photos = listOfNotNull(photoUri))
     }
 
     fun onIntent(intent: ItemConfirmIntent) {

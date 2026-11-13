@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ar
 
+import android.graphics.Bitmap
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -19,6 +20,8 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.windrr.hyundaesub.measure.MeasureGeometry
 import com.windrr.hyundaesub.measure.MeasureShape
 import com.windrr.hyundaesub.measure.Vec3
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -82,6 +85,7 @@ class ArMeasureRenderer(
         data object Undo : Command
         data class Delete(val segmentIndex: Int) : Command
         data object Reset : Command
+        data class Photo(val onCaptured: (Bitmap) -> Unit) : Command
     }
 
     private class Segment(val start: Anchor, val end: Anchor)
@@ -113,6 +117,11 @@ class ArMeasureRenderer(
 
     fun reset() {
         commands.add(Command.Reset)
+    }
+
+    /** ○ 버튼: 지금 카메라 화면(측정 선·버튼 제외)을 사진으로. 콜백은 GL 스레드에서 불린다 */
+    fun capturePhoto(onCaptured: (Bitmap) -> Unit) {
+        commands.add(Command.Photo(onCaptured))
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -170,6 +179,7 @@ class ArMeasureRenderer(
                     it.end.detach()
                     segments.removeAt(command.segmentIndex)
                 }
+                is Command.Photo -> command.onCaptured(readCameraPixels())
                 Command.Reset -> {
                     segments.forEach {
                         it.start.detach()
@@ -323,6 +333,17 @@ class ArMeasureRenderer(
             previewLine = preview,
             lengthsCm = lengths,
         )
+    }
+
+    /** 방금 그린 카메라 배경을 비트맵으로 (GL은 아래→위 순서라 세로로 뒤집는다) */
+    private fun readCameraPixels(): Bitmap {
+        val buffer = ByteBuffer.allocateDirect(viewWidth * viewHeight * 4).order(ByteOrder.nativeOrder())
+        GLES20.glReadPixels(0, 0, viewWidth, viewHeight, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buffer)
+        buffer.rewind()
+        val raw = Bitmap.createBitmap(viewWidth, viewHeight, Bitmap.Config.ARGB_8888)
+        raw.copyPixelsFromBuffer(buffer)
+        val flip = android.graphics.Matrix().apply { preScale(1f, -1f) }
+        return Bitmap.createBitmap(raw, 0, 0, viewWidth, viewHeight, flip, false).also { raw.recycle() }
     }
 
     private fun Pose.toVec3() = Vec3(tx(), ty(), tz())
