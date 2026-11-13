@@ -16,146 +16,103 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
-import com.windrr.hyundaesub.measure.BoxSize
-import com.windrr.hyundaesub.measure.FloorCircle
-import com.windrr.hyundaesub.measure.FloorRect
 import com.windrr.hyundaesub.measure.MeasureGeometry
 import com.windrr.hyundaesub.measure.MeasureShape
 import com.windrr.hyundaesub.measure.Vec3
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.cos
 import kotlin.math.roundToInt
-
-/** 측정 단계 (바닥 점 3개 → 높이 → 완료) */
-enum class MeasureStep {
-    POINT_A,
-    POINT_B,
-    POINT_C,
-    HEIGHT,
-    DONE,
-}
+import kotlin.math.sin
 
 /** 추적이 안 될 때 이유 (안내 문구용) */
 enum class TrackingIssue { INITIALIZING, LOW_LIGHT, FEW_FEATURES, FAST_MOTION, CAMERA }
 
-/** 화면에 그릴 모서리. measured = 치수를 재는 모서리(가로·세로·높이 / 지름·높이) */
-data class ScreenEdge(val from: Offset, val to: Offset, val measured: Boolean)
+/** 확정된 측정 선 하나 (시작점 → 끝점). trashAt = 선 끝 삭제 버튼 위치 */
+data class ScreenSegment(val from: Offset, val to: Offset, val text: String, val trashAt: Offset)
 
-/** 마지막 점 → 조준점 실시간 선 (삼성 간편 측정의 노란 선). 아직 확정 전 */
+/** 시작점 → 조준점 실시간 노란 선 */
 data class PreviewLine(val from: Offset, val to: Offset, val text: String)
-
-/** 모서리 치수 라벨. outward = 상자 바깥쪽 방향(단위 벡터) — 라벨을 선에서 살짝 띄울 때 쓴다 */
-data class DimLabel(val at: Offset, val outward: Offset, val text: String)
 
 /** 화면에 보여줄 측정 상태 (GL 스레드에서 만들어 최대 30fps로 전달) */
 data class MeasureUiState(
     /** 추적 상태. 잠깐 끊기는 것은 무시하고 일정 시간 이상 끊겼을 때만 false */
     val tracking: Boolean = false,
-    /** 추적이 안 될 때 이유 */
     val trackingIssue: TrackingIssue? = TrackingIssue.INITIALIZING,
-    /** 화면 가운데 조준점이 실제 표면(또는 높이)을 가리키는지 */
-    val aimValid: Boolean = false,
+    /** 표면을 한 번이라도 인식했는지 (한 번 찾으면 계속 true) */
+    val surfaceFound: Boolean = false,
     /** 조준 링: 조준점이 닿은 표면 방향으로 누운 원을 화면에 투영한 점들 (표면이 없으면 빈 목록) */
     val aimRing: List<Offset> = emptyList(),
+    /** 조준점이 기존 점에 달라붙었는지 */
+    val aimSnapped: Boolean = false,
     /** 카메라에서 조준점까지 거리 (cm) — "대상까지 88cm" */
     val aimDistanceCm: Int? = null,
-    /** 마지막 점 → 조준점 실시간 선 */
-    val previewLine: PreviewLine? = null,
-    /** 바닥을 한 번이라도 인식했는지 (한 번 찾으면 계속 true) */
-    val floorFound: Boolean = false,
-    val step: MeasureStep = MeasureStep.POINT_A,
-    val tapMissed: Boolean = false,
-    /** 원통: 세 점이 한 줄에 가까워 원을 만들 수 없음 */
-    val badCircle: Boolean = false,
-    /** 찍은 점 (끌어서 옮길 수 있는 손잡이): 바닥 점들 + 높이 끝 */
+    /** 확정된 선들 */
+    val segments: List<ScreenSegment> = emptyList(),
+    /** 시작점만 찍고 끝점을 기다리는 중 */
+    val waitingEnd: Boolean = false,
+    /** 찍은 점들 (화면 좌표) */
     val points: List<Offset> = emptyList(),
-    /** 지금 끌고 있는 점의 index (points 기준), 없으면 null */
-    val draggingIndex: Int? = null,
-    /** 직육면체·원통 모서리 */
-    val edges: List<ScreenEdge> = emptyList(),
-    val labels: List<DimLabel> = emptyList(),
-    val size: BoxSize = BoxSize(null, null, null),
+    val previewLine: PreviewLine? = null,
+    /** 확정된 선 길이 (cm, 찍은 순서) */
+    val lengthsCm: List<Float> = emptyList(),
 )
 
 /**
- * 꼭짓점 직접 터치 측정 (네모 / 원통).
- *
- * - 바닥 점은 표면 인식(특징점·깊이) 대신 **인식한 바닥 평면과 터치 시선의 교점**으로 잡는다.
- *   물건 바닥 꼭짓점은 항상 바닥 위에 있어서, 물건 옆면이나 노이즈 많은 특징점에 찍히지 않고
- *   터치한 곳 바로 그 지점이 정확히 잡힌다. 바닥 높이는 첫 점에서 정하고 이후 점에 같이 쓴다.
- * - 네모: 바닥 꼭짓점 세 개를 **아무 순서로** 찍으면 직각에 가장 가까운 점을 모서리로 보고 상자를 만든다.
- * - 원통: 바닥 둘레 아무 곳 세 점 → 원.
- * - 높이: 물건 윗면(인식된 평면)을 찍으면 그 높이, 아니면 바닥 꼭짓점(둘레) 수직선 중 시선과 가장 가까운 곳.
- * - 찍은 점은 언제든 **끌어서 옮길 수 있다** (바닥 점은 바닥 위에서, 높이 점은 높이만).
+ * 삼성 간편 측정과 같은 선 측정.
+ * - 화면 가운데 조준 링을 카메라로 움직여 점에 맞추고 + → 시작점, 다시 + → 끝점 (선 하나 완성)
+ * - 시작점을 찍으면 시작점 → 조준점 노란 선과 3D 길이를 실시간으로 보여준다
+ * - 조준점이 이미 찍은 점 근처면 그 점에 달라붙는다 (꼭짓점에서 이어 재기)
+ * - 되돌리기는 마지막 점부터, 선 끝의 휴지통은 그 선을 지운다
+ * 점은 조준점이 닿은 실제 표면 깊이에 고정한다. 표면을 못 찾으면 찍지 않는다.
  */
 class ArMeasureRenderer(
     private val session: Session,
     private val displayRotation: () -> Int,
-    /** BOX = 바닥 꼭짓점 3개, CYLINDER = 바닥 둘레 3점 */
-    private val shape: MeasureShape = MeasureShape.BOX,
-    /** 점을 잡았다고 볼 화면 거리 (px) */
-    private val grabRadiusPx: Float = 120f,
+    /** 바닥 모양 (선 측정에서는 안내 문구에만 쓰인다) */
+    @Suppress("unused") private val shape: MeasureShape = MeasureShape.BOX,
+    /** 조준점이 기존 점에 달라붙는 화면 거리 (px) */
+    private val snapRadiusPx: Float = 90f,
     private val onUpdate: (MeasureUiState) -> Unit,
 ) : GLSurfaceView.Renderer {
 
-    private sealed interface TouchEvent {
-        data class Tap(val at: Offset) : TouchEvent
-        data class DragStart(val at: Offset) : TouchEvent
-        data class DragMove(val at: Offset) : TouchEvent
-        data object DragEnd : TouchEvent
+    private sealed interface Command {
+        data object Capture : Command
+        data object Undo : Command
+        data class Delete(val segmentIndex: Int) : Command
+        data object Reset : Command
     }
 
+    private class Segment(val start: Anchor, val end: Anchor)
+
     private val background = CameraBackgroundRenderer()
-    private val events = ConcurrentLinkedQueue<TouchEvent>()
-    private val anchors = mutableListOf<Anchor>()
-    private var heightAnchor: Anchor? = null
+    private val commands = ConcurrentLinkedQueue<Command>()
+    private val segments = mutableListOf<Segment>()
+    private var pendingStart: Anchor? = null
     private var viewWidth = 1
     private var viewHeight = 1
     private var lastUiUpdateMs = 0L
-    private var tapMissed = false
-    private var badCircle = false
-    private var floorFoundLatched = false
+    private var surfaceFoundLatched = false
     private var lostSinceMs: Long? = null
-    /** 직전 프레임에 그린 손잡이 화면 좌표 (끌기 시작할 점 찾기용) */
-    private var lastHandles: List<Offset?> = emptyList()
-    /** 끌고 있는 손잡이: 0..2 바닥 점, 3 높이 점 */
-    private var dragIndex: Int? = null
 
-    @Volatile
-    private var resetRequested = false
-
-    @Volatile
-    private var undoRequested = false
-
-    fun onTap(x: Float, y: Float) {
-        events.add(TouchEvent.Tap(Offset(x, y)))
-    }
-
-    /** "+" 버튼: 화면 가운데 조준점 위치에 점 찍기 */
+    /** + 버튼: 조준점 위치에 시작점 또는 끝점 */
     fun captureAtAim() {
-        events.add(TouchEvent.Tap(Offset.Unspecified))
+        commands.add(Command.Capture)
     }
 
-    fun onDragStart(x: Float, y: Float) {
-        events.add(TouchEvent.DragStart(Offset(x, y)))
-    }
-
-    fun onDrag(x: Float, y: Float) {
-        events.add(TouchEvent.DragMove(Offset(x, y)))
-    }
-
-    fun onDragEnd() {
-        events.add(TouchEvent.DragEnd)
-    }
-
-    /** 마지막 단계 되돌리기 (높이 → 바닥 점 역순) */
+    /** 마지막 점 되돌리기 */
     fun undo() {
-        undoRequested = true
+        commands.add(Command.Undo)
+    }
+
+    /** 선 하나 지우기 (휴지통) */
+    fun deleteSegment(index: Int) {
+        commands.add(Command.Delete(index))
     }
 
     fun reset() {
-        resetRequested = true
+        commands.add(Command.Reset)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -173,31 +130,6 @@ class ArMeasureRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        if (resetRequested) {
-            anchors.forEach { it.detach() }
-            anchors.clear()
-            heightAnchor?.detach()
-            heightAnchor = null
-            events.clear()
-            dragIndex = null
-            tapMissed = false
-            badCircle = false
-            resetRequested = false
-        }
-        if (undoRequested) {
-            when {
-                heightAnchor != null -> {
-                    heightAnchor?.detach()
-                    heightAnchor = null
-                }
-                anchors.isNotEmpty() -> anchors.removeAt(anchors.lastIndex).detach()
-            }
-            dragIndex = null
-            tapMissed = false
-            badCircle = false
-            undoRequested = false
-        }
-
         val frame = try {
             session.update()
         } catch (e: CameraNotAvailableException) {
@@ -208,130 +140,102 @@ class ArMeasureRenderer(
         val camera = frame.camera
         val now = SystemClock.elapsedRealtime()
         val trackingNow = camera.trackingState == TrackingState.TRACKING
-        // 추적이 잠깐 끊겼다 붙는 것은 안내 문구를 바꾸지 않는다
+        // 추적이 잠깐 끊겼다 붙는 것은 안내를 바꾸지 않는다
         lostSinceMs = if (trackingNow) null else lostSinceMs ?: now
         val trackingStable = lostSinceMs?.let { now - it < TRACKING_LOST_GRACE_MS } ?: true
-        val issue = if (trackingNow) null else trackingIssueOf(camera.trackingFailureReason)
-        if (!floorFoundLatched) floorFoundLatched = trackedFloorY() != null
 
         val projection = FloatArray(16).also { camera.getProjectionMatrix(it, 0, 0.05f, 100f) }
         val view = FloatArray(16).also { camera.getViewMatrix(it, 0) }
         val viewProj = FloatArray(16).also { Matrix.multiplyMM(it, 0, projection, 0, view, 0) }
         val invViewProj = FloatArray(16).also { Matrix.invertM(it, 0, viewProj, 0) }
+        val project = { p: Vec3 ->
+            MeasureGeometry.projectToScreen(p, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) }
+        }
 
+        // 조준: 가운데 시선이 닿은 표면, 기존 점 근처면 그 점에 달라붙기
         val center = Offset(viewWidth / 2f, viewHeight / 2f)
+        val surface = if (trackingNow) aimSurfaceAt(frame, center, invViewProj) else null
+        if (surface != null) surfaceFoundLatched = true
+        val snapTarget = if (trackingNow) snapPointNear(center, project) else null
+        val aimPoint = snapTarget ?: surface?.first
+
         var changed = false
-        // 추적 전이면 터치를 버리지 않고 다음 프레임까지 기다린다 (끌기 이동만 버림)
-        while (trackingNow) {
-            val event = events.poll() ?: break
-            when (event) {
-                is TouchEvent.Tap -> handleTap(frame, if (event.at == Offset.Unspecified) center else event.at, invViewProj)
-                is TouchEvent.DragStart -> dragIndex = nearestHandle(event.at)
-                is TouchEvent.DragMove -> dragIndex?.let { moveHandle(frame, it, event.at, invViewProj) }
-                TouchEvent.DragEnd -> dragIndex = null
+        while (true) {
+            val command = commands.poll() ?: break
+            when (command) {
+                Command.Capture -> if (trackingNow) capture(aimPoint)
+                Command.Undo -> undoLast()
+                is Command.Delete -> segments.getOrNull(command.segmentIndex)?.let {
+                    it.start.detach()
+                    it.end.detach()
+                    segments.removeAt(command.segmentIndex)
+                }
+                Command.Reset -> {
+                    segments.forEach {
+                        it.start.detach()
+                        it.end.detach()
+                    }
+                    segments.clear()
+                    pendingStart?.detach()
+                    pendingStart = null
+                }
             }
             changed = true
         }
-        if (!trackingNow) events.removeAll { it is TouchEvent.DragMove }
 
         if (!changed && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
         lastUiUpdateMs = now
 
-        // 조준점 (삼성 간편 측정처럼): 가운데가 닿은 표면 + 다음 바닥 점 또는 높이를 실시간으로
-        val step = currentStep()
-        val aimSurface = if (trackingNow && step != MeasureStep.DONE) aimSurfaceAt(frame, center, invViewProj) else null
-        val aimBase = if (step <= MeasureStep.POINT_C) aimSurface?.first else null
-        val aimTop = if (trackingNow && step == MeasureStep.HEIGHT) heightTopAt(frame, center, invViewProj) else null
-        val state = buildState(trackingStable, step, viewProj, aimBase, aimTop)
-            .withAim(aimSurface, camera.pose.toVec3(), viewProj)
-        onUpdate(state.copy(trackingIssue = if (trackingStable) null else issue ?: TrackingIssue.INITIALIZING))
+        val ring = when {
+            snapTarget != null -> ringAround(snapTarget, Vec3.UP, project)
+            surface != null -> ringAround(surface.first, surface.second, project)
+            else -> emptyList()
+        }
+        val issue = if (trackingStable) null else trackingIssueOf(camera.trackingFailureReason)
+        onUpdate(
+            buildState(trackingStable, issue, project, aimPoint, ring, snapTarget != null, camera.pose.toVec3()),
+        )
     }
 
-    private fun currentStep(): MeasureStep = when {
-        anchors.size == 0 -> MeasureStep.POINT_A
-        anchors.size == 1 -> MeasureStep.POINT_B
-        anchors.size == 2 -> MeasureStep.POINT_C
-        heightAnchor == null -> MeasureStep.HEIGHT
-        else -> MeasureStep.DONE
-    }
-
-    /** 탭 = 그 자리가 꼭짓점. 인식 상태와 상관없이 항상 점을 찍는다 */
-    private fun handleTap(frame: Frame, tap: Offset, invViewProj: FloatArray) {
-        when (currentStep()) {
-            MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> {
-                val anchor = placeFloorAnchor(frame, tap, invViewProj)
-                tapMissed = false
-                badCircle = false
-                if (shape == MeasureShape.CYLINDER && anchors.size == 2) {
-                    val (a, b) = anchors.map { it.pose.toVec3() }
-                    if (!validCircle(a, b, anchor.pose.toVec3())) {
-                        anchor.detach()
-                        badCircle = true
-                        return
-                    }
-                }
-                anchors += anchor
-            }
-            MeasureStep.HEIGHT -> {
-                val top = heightTopAt(frame, tap, invViewProj)
-                tapMissed = top == null
-                top?.let { heightAnchor = anchorAt(it) }
-            }
-            MeasureStep.DONE -> Unit
+    /** + : 시작점이 없으면 시작점, 있으면 끝점으로 선 완성. 조준점이 없으면(표면 미인식) 무시 */
+    private fun capture(aim: Vec3?) {
+        aim ?: return
+        val start = pendingStart
+        if (start == null) {
+            pendingStart = anchorAt(aim)
+        } else {
+            if ((aim - start.pose.toVec3()).length() < MIN_SEGMENT_M) return
+            segments += Segment(start, anchorAt(aim))
+            pendingStart = null
         }
     }
 
-    /** 끌기: 바닥 점은 바닥 위에서, 높이 점은 높이만 바뀐다. 인식 못 한 위치면 그대로 둔다 */
-    private fun moveHandle(frame: Frame, index: Int, at: Offset, invViewProj: FloatArray) {
-        if (index < anchors.size) {
-            val anchor = placeFloorAnchor(frame, at, invViewProj)
-            if (shape == MeasureShape.CYLINDER && anchors.size == 3) {
-                val others = anchors.indices.filter { it != index }.map { anchors[it].pose.toVec3() }
-                if (!validCircle(others[0], others[1], anchor.pose.toVec3())) {
-                    anchor.detach()
-                    return
-                }
-            }
-            anchors[index].detach()
-            anchors[index] = anchor
-            badCircle = false
-        } else if (index == HEIGHT_HANDLE) {
-            val top = heightTopAt(frame, at, invViewProj) ?: return
-            heightAnchor?.detach()
-            heightAnchor = anchorAt(top)
+    /** 되돌리기: 끝점을 기다리는 시작점 → 지움, 아니면 마지막 선의 끝점을 지워 다시 끝점 대기 */
+    private fun undoLast() {
+        val start = pendingStart
+        if (start != null) {
+            start.detach()
+            pendingStart = null
+            return
         }
-        tapMissed = false
+        val last = segments.removeLastOrNull() ?: return
+        last.end.detach()
+        pendingStart = last.start
     }
 
-    private fun nearestHandle(at: Offset): Int? =
-        lastHandles.withIndex()
-            .mapNotNull { (i, p) -> p?.let { i to (it - at).getDistance() } }
-            .filter { it.second <= grabRadiusPx }
+    /** 이미 찍은 점 중 조준점(화면 가운데)에서 가까운 점 */
+    private fun snapPointNear(center: Offset, project: (Vec3) -> Offset?): Vec3? =
+        allPoints()
+            .mapNotNull { p -> project(p)?.let { p to (it - center).getDistance() } }
+            .filter { it.second <= snapRadiusPx }
             .minByOrNull { it.second }
             ?.first
 
-    private fun validCircle(a: Vec3, b: Vec3, c: Vec3): Boolean {
-        val circle = MeasureGeometry.circleThrough(a, b, c)
-        return circle != null && circle.radius <= MAX_RADIUS_M
-    }
+    private fun allPoints(): List<Vec3> =
+        segments.flatMap { listOf(it.start.pose.toVec3(), it.end.pose.toVec3()) } +
+            listOfNotNull(pendingStart?.pose?.toVec3())
 
-    private fun anchorAt(p: Vec3): Anchor = session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
-
-    /**
-     * 탭한 곳에 점을 고정한다 (회사에서 잘 되던 79d95d6 방식 복구). 항상 앵커를 돌려준다.
-     * - 터치 시선에서 처음 닿는 실제 표면(평면 안쪽·깊이·특징점)까지의 거리만큼 시선 위에 점을 둔다.
-     *   → 점이 손가락 바로 아래, 실제로 닿은 깊이에 있어서 폰을 움직여도 그 자리에 붙어 있다.
-     * - 표면을 하나도 못 찾았을 때만 인스턴트 배치(ARCore가 실제 깊이로 보정)
-     */
-    private fun placeFloorAnchor(frame: Frame, at: Offset, invViewProj: FloatArray): Anchor {
-        surfacePointOnTapRay(frame, at, invViewProj)?.let { return anchorAt(it) }
-        frame.hitTestInstantPlacement(at.x, at.y, INSTANT_PLACEMENT_DISTANCE_M).firstOrNull()
-            ?.let { return it.createAnchor() }
-        val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
-        return anchorAt(ray.origin + ray.direction.normalized() * INSTANT_PLACEMENT_DISTANCE_M)
-    }
-
-    /** 조준점이 닿은 표면 지점과 표면 방향(법선) */
+    /** 조준점이 닿은 실제 표면 지점(시선 위)과 표면 방향(법선) */
     private fun aimSurfaceAt(frame: Frame, at: Offset, invViewProj: FloatArray): Pair<Vec3, Vec3>? {
         val hit = frame.hitTest(at.x, at.y).firstOrNull { it.isOnSurface() } ?: return null
         val eye = frame.camera.pose.toVec3()
@@ -342,33 +246,6 @@ class ArMeasureRenderer(
         return (eye + direction * hit.distance) to normal
     }
 
-    /** 조준 링·거리 채우기 */
-    private fun MeasureUiState.withAim(aim: Pair<Vec3, Vec3>?, eye: Vec3, viewProj: FloatArray): MeasureUiState {
-        aim ?: return this
-        val (point, normal) = aim
-        val ref = if (kotlin.math.abs(normal.y) < 0.9f) Vec3.UP else Vec3(1f, 0f, 0f)
-        val u = cross(normal, ref).normalized()
-        val v = cross(normal, u).normalized()
-        val ring = List(RING_SEGMENTS) { i ->
-            val t = (2.0 * Math.PI * i / RING_SEGMENTS).toFloat()
-            point + (u * kotlin.math.cos(t) + v * kotlin.math.sin(t)) * RING_RADIUS_M
-        }.mapNotNull { MeasureGeometry.projectToScreen(it, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) } }
-        return copy(
-            aimRing = if (ring.size == RING_SEGMENTS) ring else emptyList(),
-            aimDistanceCm = ((point - eye).length() * 100f).roundToInt(),
-        )
-    }
-
-    private fun cross(a: Vec3, b: Vec3) = Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
-
-    /** 터치 시선 위, 처음 닿는 실제 표면까지의 거리에 있는 지점 */
-    private fun surfacePointOnTapRay(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
-        val hit = frame.hitTest(at.x, at.y).firstOrNull { it.isOnSurface() } ?: return null
-        val eye = frame.camera.pose.toVec3()
-        val direction = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj).direction
-        return eye + direction.normalized() * hit.distance
-    }
-
     private fun HitResult.isOnSurface(): Boolean = when (val target = trackable) {
         is Plane -> target.isPoseInPolygon(hitPose)
         is DepthPoint -> true
@@ -376,59 +253,21 @@ class ArMeasureRenderer(
         else -> false
     }
 
-    /** 인식한 위를 향한 수평면 중 가장 낮은 것 = 바닥 */
-    private fun trackedFloorY(): Float? =
-        session.getAllTrackables(Plane::class.java)
-            .filter {
-                it.trackingState == TrackingState.TRACKING &&
-                    it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
-                    it.subsumedBy == null
-            }
-            .minOfOrNull { it.centerPose.ty() }
-
-    /**
-     * 높이 끝점. 물건 윗면이 평면으로 인식돼 있고 그 위를 찍었으면 그 높이,
-     * 아니면 바닥 꼭짓점(원통은 둘레) 수직선 중 시선과 가장 가까운 수직선 위 지점.
-     * 노이즈가 큰 특징점·깊이 값은 높이에 쓰지 않는다.
-     */
-    private fun heightTopAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
-        val baseY = anchors.firstOrNull()?.pose?.ty() ?: return null
-        val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
-        val verticals: List<Vec3>
-        val insideTop: (Vec3) -> Boolean
-        if (shape == MeasureShape.CYLINDER) {
-            val circle = floorCircle() ?: return null
-            verticals = circle.rim(RIM_SAMPLES)
-            insideTop = { circle.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
-        } else {
-            val rect = floorRect() ?: return null
-            verticals = rect.corners
-            insideTop = { rect.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
-        }
-        // 물건 윗면을 찍었으면 그 지점 (회사 버전과 동일), 아니면 수직선 기준
-        val onTopPlane = surfacePointOnTapRay(frame, at, invViewProj)
-            ?.takeIf { insideTop(it) && it.y - baseY >= MIN_HEIGHT_M }
-        val top = onTopPlane
-            ?: MeasureGeometry.topOnNearestVertical(verticals, ray)
-            // 수직선과 만나지 않으면(거의 위에서 내려다봄) 시선이 바닥 중심 위를 지나는 높이로 근사
-            ?: verticals.reduce { acc, v -> acc + v }.let { sum ->
-                val c = sum * (1f / verticals.size)
-                MeasureGeometry.heightAlongVertical(Vec3(c.x, baseY, c.z), ray)?.let { h -> Vec3(c.x, baseY + h, c.z) }
-            }
-        return top?.takeIf { it.y - baseY >= MIN_HEIGHT_M }
+    /** 표면 방향으로 누운 원 (화면 투영) */
+    private fun ringAround(point: Vec3, normal: Vec3, project: (Vec3) -> Offset?): List<Offset> {
+        val ref = if (kotlin.math.abs(normal.y) < 0.9f) Vec3.UP else Vec3(1f, 0f, 0f)
+        val u = cross(normal, ref).normalized()
+        val v = cross(normal, u).normalized()
+        val ring = List(RING_SEGMENTS) { i ->
+            val t = (2.0 * Math.PI * i / RING_SEGMENTS).toFloat()
+            point + (u * cos(t) + v * sin(t)) * RING_RADIUS_M
+        }.mapNotNull(project)
+        return if (ring.size == RING_SEGMENTS) ring else emptyList()
     }
 
-    private fun floorCircle(): FloorCircle? {
-        if (anchors.size < 3) return null
-        val (a, b, c) = anchors.take(3).map { it.pose.toVec3() }
-        return MeasureGeometry.circleThrough(a, b, c)
-    }
+    private fun cross(a: Vec3, b: Vec3) = Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
 
-    private fun floorRect(): FloorRect? {
-        if (anchors.size < 3) return null
-        val (a, b, c) = anchors.take(3).map { it.pose.toVec3() }
-        return MeasureGeometry.rectifyFloorAnyOrder(a, b, c)
-    }
+    private fun anchorAt(p: Vec3): Anchor = session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
 
     private fun trackingIssueOf(reason: TrackingFailureReason): TrackingIssue = when (reason) {
         TrackingFailureReason.INSUFFICIENT_LIGHT -> TrackingIssue.LOW_LIGHT
@@ -438,227 +277,70 @@ class ArMeasureRenderer(
         else -> TrackingIssue.INITIALIZING
     }
 
-    /**
-     * aimBase/aimTop: 조준점이 가리키는 다음 바닥 점·높이 끝 (미리보기, 아직 찍지 않음).
-     * 미리보기를 찍은 점처럼 넣어 상자·치수를 실시간으로 그린다. 손잡이(끌기)는 실제로 찍은 점만.
-     */
     private fun buildState(
         tracking: Boolean,
-        step: MeasureStep,
-        viewProj: FloatArray,
-        aimBase: Vec3?,
-        aimTop: Vec3?,
+        issue: TrackingIssue?,
+        project: (Vec3) -> Offset?,
+        aim: Vec3?,
+        ring: List<Offset>,
+        snapped: Boolean,
+        eye: Vec3,
     ): MeasureUiState {
-        val project = { p: Vec3 ->
-            MeasureGeometry.projectToScreen(p, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) }
-        }
-        // 확정된 점으로만 상자를 그리고, 조준점은 노란 미리보기 선으로 따로 보여준다
-        val real = anchors.map { it.pose.toVec3() }
-        val realTop = heightAnchor?.pose?.toVec3()
-        val placed = real
-        val top = realTop
-
-        val edges = mutableListOf<ScreenEdge>()
-        val labels = mutableListOf<DimLabel>()
-        var size = BoxSize(null, null, null)
-
-        fun edge(a: Vec3, b: Vec3, measured: Boolean): Pair<Offset, Offset>? {
-            val from = project(a) ?: return null
-            val to = project(b) ?: return null
-            edges += ScreenEdge(from, to, measured)
-            return from to to
-        }
-
-        fun label(line: Pair<Offset, Offset>?, valueM: Float, boxCenter: Offset?) {
-            line ?: return
-            val mid = (line.first + line.second) / 2f
-            labels += DimLabel(mid, outwardOf(line, mid, boxCenter), "${(valueM * 100f).roundToInt()} cm")
-        }
-
-        when {
-            placed.size >= 3 && shape == MeasureShape.CYLINDER -> {
-                MeasureGeometry.circleThrough(placed[0], placed[1], placed[2])?.let { circle ->
-                    val height = top?.let { it.y - circle.center.y }
-                    addCylinder(circle, placed[0], height, ::edge, ::label, project, size = { size = it })
-                }
-            }
-            placed.size >= 3 -> {
-                val rect = MeasureGeometry.rectifyFloorAnyOrder(placed[0], placed[1], placed[2])
-                val height = top?.let { it.y - rect.a.y }
-                addBox(rect, height, ::edge, ::label, project, size = { size = it })
-            }
-            // 두 점: 길이만 표시 (세 번째 점을 찍어야 가로·세로가 정해진다)
-            placed.size == 2 -> {
-                val line = edge(placed[0], placed[1], measured = true)
-                label(line, MeasureGeometry.horizontalDistance(placed[0], placed[1]), null)
+        val screenSegments = mutableListOf<ScreenSegment>()
+        val lengths = mutableListOf<Float>()
+        segments.forEach { seg ->
+            val a = seg.start.pose.toVec3()
+            val b = seg.end.pose.toVec3()
+            val cm = (b - a).length() * 100f
+            lengths += cm
+            val from = project(a)
+            val to = project(b)
+            if (from != null && to != null) {
+                // 휴지통: 끝점에서 선 방향으로 조금 더 나간 곳
+                val d = to - from
+                val dir = d / d.getDistance().coerceAtLeast(1f)
+                screenSegments += ScreenSegment(from, to, "${cm.roundToInt()} cm", to + dir * TRASH_OFFSET_PX)
             }
         }
-
-        // 미리보기 선: 바닥 단계 = 마지막 점 → 조준점(수평 길이), 높이 단계 = 조준점 바로 아래 바닥 → 조준점(높이)
-        val previewLine = when {
-            aimBase != null && real.isNotEmpty() -> {
-                val from = project(real.last())
-                val to = project(aimBase)
-                if (from != null && to != null) {
-                    PreviewLine(from, to, "${(MeasureGeometry.horizontalDistance(real.last(), aimBase) * 100f).roundToInt()} cm")
-                } else {
-                    null
-                }
-            }
-            aimTop != null && real.isNotEmpty() -> {
-                val baseY = real.first().y
-                val from = project(Vec3(aimTop.x, baseY, aimTop.z))
-                val to = project(aimTop)
-                if (from != null && to != null) PreviewLine(from, to, "${((aimTop.y - baseY) * 100f).roundToInt()} cm") else null
-            }
-            else -> null
+        val start = pendingStart?.pose?.toVec3()
+        val preview = if (start != null && aim != null) {
+            val from = project(start)
+            val to = project(aim)
+            if (from != null && to != null) PreviewLine(from, to, "${((aim - start).length() * 100f).roundToInt()} cm") else null
+        } else {
+            null
         }
-
-        // 손잡이: 바닥 점 0..2 + 높이 점(index 3)
-        val handles = real.map(project) + List(HEIGHT_HANDLE - real.size) { null } + listOf(realTop?.let(project))
-        lastHandles = handles
-        val points = handles.filterNotNull()
-        val draggingPoint = dragIndex?.let { handles.getOrNull(it) }
-
         return MeasureUiState(
             tracking = tracking,
-            aimValid = (aimBase ?: aimTop) != null,
-            floorFound = floorFoundLatched,
-            step = step,
-            tapMissed = tapMissed,
-            badCircle = badCircle,
-            points = points,
-            draggingIndex = draggingPoint?.let { points.indexOf(it) }?.takeIf { it >= 0 },
-            edges = edges,
-            labels = labels,
-            previewLine = previewLine,
-            size = size,
+            trackingIssue = issue,
+            surfaceFound = surfaceFoundLatched,
+            aimRing = ring,
+            aimSnapped = snapped,
+            aimDistanceCm = aim?.let { ((it - eye).length() * 100f).roundToInt() },
+            segments = screenSegments,
+            waitingEnd = start != null,
+            points = allPoints().mapNotNull(project),
+            previewLine = preview,
+            lengthsCm = lengths,
         )
-    }
-
-    /**
-     * 바닥 직사각형(+높이)으로 상자 모서리와 라벨을 만든다.
-     * 가로 = A→B, 세로 = B→C, 높이 = 화면에서 가장 오른쪽 기둥 (시안처럼 오른쪽에 높이 표시).
-     * 높이 라벨을 붙인 기둥의 윗점 화면 좌표를 돌려준다.
-     */
-    private fun addBox(
-        rect: FloorRect,
-        height: Float?,
-        edge: (Vec3, Vec3, Boolean) -> Pair<Offset, Offset>?,
-        label: (Pair<Offset, Offset>?, Float, Offset?) -> Unit,
-        project: (Vec3) -> Offset?,
-        size: (BoxSize) -> Unit,
-    ): Offset? {
-        val base = rect.corners
-        val top = height?.let { rect.top(it) }
-        val center = (base + top.orEmpty()).mapNotNull(project).takeIf { it.isNotEmpty() }?.let { pts ->
-            pts.reduce { acc, o -> acc + o } / pts.size.toFloat()
-        }
-
-        // 측정하지 않는 모서리 먼저 (측정 모서리가 위에 그려지도록)
-        edge(rect.c, rect.d, false)
-        edge(rect.d, rect.a, false)
-        var heightColumn = -1
-        if (top != null) {
-            heightColumn = base.indices.maxByOrNull { project(base[it])?.x ?: Float.NEGATIVE_INFINITY } ?: 0
-            for (i in 0 until 4) edge(top[i], top[(i + 1) % 4], false)
-            base.indices.filter { it != heightColumn }.forEach { edge(base[it], top[it], false) }
-        }
-
-        label(edge(rect.a, rect.b, true), rect.width, center)
-        label(edge(rect.b, rect.c, true), rect.depth, center)
-        var topPoint: Offset? = null
-        if (top != null && height != null) {
-            label(edge(base[heightColumn], top[heightColumn], true), height, center)
-            topPoint = project(top[heightColumn])
-        }
-        size(BoxSize(rect.width * 100f, rect.depth * 100f, height?.times(100f)))
-        return topPoint
-    }
-
-    /**
-     * 원통: 바닥 원·윗면 원(둘레를 선분으로 근사) + 화면 좌우 끝 옆선 + 지름선.
-     * 지름 라벨은 첫 번째 둘레 점 A를 지나는 지름, 높이 라벨은 화면에서 가장 오른쪽 옆선.
-     * 실을 때는 지름 × 지름 × 높이 상자로 본다.
-     */
-    private fun addCylinder(
-        circle: FloorCircle,
-        firstRimPoint: Vec3,
-        height: Float?,
-        edge: (Vec3, Vec3, Boolean) -> Pair<Offset, Offset>?,
-        label: (Pair<Offset, Offset>?, Float, Offset?) -> Unit,
-        project: (Vec3) -> Offset?,
-        size: (BoxSize) -> Unit,
-    ) {
-        val start = kotlin.math.atan2(firstRimPoint.z - circle.center.z, firstRimPoint.x - circle.center.x)
-        val base = circle.rim(RIM_SEGMENTS, start)
-        val top = height?.let { circle.rim(RIM_SEGMENTS, start, it) }
-        val center = (base + top.orEmpty()).mapNotNull(project).takeIf { it.isNotEmpty() }?.let { pts ->
-            pts.reduce { acc, o -> acc + o } / pts.size.toFloat()
-        }
-
-        for (i in base.indices) edge(base[i], base[(i + 1) % base.size], false)
-        if (top != null) {
-            for (i in top.indices) edge(top[i], top[(i + 1) % top.size], false)
-        }
-
-        // 지름: A에서 중심을 지나 반대편까지
-        val opposite = base[RIM_SEGMENTS / 2]
-        label(edge(base[0], opposite, true), circle.diameter, center)
-
-        if (top != null && height != null) {
-            // 원통 윤곽처럼 보이도록 화면 좌우 끝에 옆선
-            val projected = base.indices.mapNotNull { i -> project(base[i])?.let { i to it.x } }
-            val left = projected.minByOrNull { it.second }?.first
-            val right = projected.maxByOrNull { it.second }?.first
-            left?.let { edge(base[it], top[it], false) }
-            right?.let { label(edge(base[it], top[it], true), height, center) }
-        }
-        size(BoxSize(circle.diameter * 100f, circle.diameter * 100f, height?.times(100f)))
-    }
-
-    /** 라벨을 선에서 띄울 방향: 선에 수직이면서 상자 중심에서 멀어지는 쪽 */
-    private fun outwardOf(line: Pair<Offset, Offset>, mid: Offset, boxCenter: Offset?): Offset {
-        val dir = line.second - line.first
-        val len = dir.getDistance()
-        if (len < 1f) return Offset(0f, -1f)
-        var normal = Offset(-dir.y / len, dir.x / len)
-        val away = boxCenter?.let { mid - it }
-        if (away != null && away.x * normal.x + away.y * normal.y < 0f) normal = -normal
-        if (away == null && normal.y > 0f) normal = -normal // 기준 없으면 위쪽
-        return normal
     }
 
     private fun Pose.toVec3() = Vec3(tx(), ty(), tz())
 
     private companion object {
-        /** 높이 손잡이 index */
-        const val HEIGHT_HANDLE = 3
-
-        /** 이보다 낮은 높이는 측정 실패로 본다 (m) */
-        const val MIN_HEIGHT_M = 0.01f
-
         const val UI_UPDATE_INTERVAL_MS = 33L
 
-        /** 추적이 이 시간 넘게 끊겨야 "폰을 천천히 움직여 주세요"를 띄운다 */
+        /** 추적이 이 시간 넘게 끊겨야 "카메라를 움직여 보세요"를 띄운다 */
         const val TRACKING_LOST_GRACE_MS = 800L
-
-        const val TOP_SURFACE_MARGIN_M = 0.05f
 
         /** 조준 링 반지름 (m)·선분 수 */
         const val RING_RADIUS_M = 0.035f
         const val RING_SEGMENTS = 32
 
-        /** 원통 둘레를 그릴 때 선분 수 (짝수 — 지름 반대편 점이 정확히 잡히도록) */
-        const val RIM_SEGMENTS = 36
+        /** 이보다 짧은 선은 같은 자리를 두 번 누른 것으로 보고 무시 (m) */
+        const val MIN_SEGMENT_M = 0.005f
 
-        /** 원통 높이 수직선 후보 수 */
-        const val RIM_SAMPLES = 24
-
-        /** 원통 반지름 상한 (m). 이보다 크면 잘못 찍은 것으로 본다 */
-        const val MAX_RADIUS_M = 1.0f
-
-        /** 표면을 못 찾았을 때 인스턴트 배치 가정 거리 (m) — ARCore가 실제 깊이로 보정한다 */
-        const val INSTANT_PLACEMENT_DISTANCE_M = 1.0f
+        /** 휴지통을 선 끝에서 띄우는 거리 (px) */
+        const val TRASH_OFFSET_PX = 36f
     }
 }
