@@ -42,6 +42,9 @@ enum class TrackingIssue { INITIALIZING, LOW_LIGHT, FEW_FEATURES, FAST_MOTION, C
 /** 화면에 그릴 모서리. measured = 치수를 재는 모서리(가로·세로·높이 / 지름·높이) */
 data class ScreenEdge(val from: Offset, val to: Offset, val measured: Boolean)
 
+/** 마지막 점 → 조준점 실시간 선 (삼성 간편 측정의 노란 선). 아직 확정 전 */
+data class PreviewLine(val from: Offset, val to: Offset, val text: String)
+
 /** 모서리 치수 라벨. outward = 상자 바깥쪽 방향(단위 벡터) — 라벨을 선에서 살짝 띄울 때 쓴다 */
 data class DimLabel(val at: Offset, val outward: Offset, val text: String)
 
@@ -53,6 +56,12 @@ data class MeasureUiState(
     val trackingIssue: TrackingIssue? = TrackingIssue.INITIALIZING,
     /** 화면 가운데 조준점이 실제 표면(또는 높이)을 가리키는지 */
     val aimValid: Boolean = false,
+    /** 조준 링: 조준점이 닿은 표면 방향으로 누운 원을 화면에 투영한 점들 (표면이 없으면 빈 목록) */
+    val aimRing: List<Offset> = emptyList(),
+    /** 카메라에서 조준점까지 거리 (cm) — "대상까지 88cm" */
+    val aimDistanceCm: Int? = null,
+    /** 마지막 점 → 조준점 실시간 선 */
+    val previewLine: PreviewLine? = null,
     /** 바닥을 한 번이라도 인식했는지 (한 번 찾으면 계속 true) */
     val floorFound: Boolean = false,
     val step: MeasureStep = MeasureStep.POINT_A,
@@ -228,11 +237,13 @@ class ArMeasureRenderer(
         if (!changed && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
         lastUiUpdateMs = now
 
-        // 조준점 미리보기 (삼성 Measure처럼): 다음 바닥 점 또는 높이를 실시간으로
+        // 조준점 (삼성 간편 측정처럼): 가운데가 닿은 표면 + 다음 바닥 점 또는 높이를 실시간으로
         val step = currentStep()
-        val aimBase = if (trackingNow && step <= MeasureStep.POINT_C) surfacePointOnTapRay(frame, center, invViewProj) else null
+        val aimSurface = if (trackingNow && step != MeasureStep.DONE) aimSurfaceAt(frame, center, invViewProj) else null
+        val aimBase = if (step <= MeasureStep.POINT_C) aimSurface?.first else null
         val aimTop = if (trackingNow && step == MeasureStep.HEIGHT) heightTopAt(frame, center, invViewProj) else null
         val state = buildState(trackingStable, step, viewProj, aimBase, aimTop)
+            .withAim(aimSurface, camera.pose.toVec3(), viewProj)
         onUpdate(state.copy(trackingIssue = if (trackingStable) null else issue ?: TrackingIssue.INITIALIZING))
     }
 
@@ -319,6 +330,36 @@ class ArMeasureRenderer(
         val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
         return anchorAt(ray.origin + ray.direction.normalized() * INSTANT_PLACEMENT_DISTANCE_M)
     }
+
+    /** 조준점이 닿은 표면 지점과 표면 방향(법선) */
+    private fun aimSurfaceAt(frame: Frame, at: Offset, invViewProj: FloatArray): Pair<Vec3, Vec3>? {
+        val hit = frame.hitTest(at.x, at.y).firstOrNull { it.isOnSurface() } ?: return null
+        val eye = frame.camera.pose.toVec3()
+        val direction = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj).direction.normalized()
+        val axis = FloatArray(3).also { hit.hitPose.getTransformedAxis(1, 1f, it, 0) }
+        var normal = Vec3(axis[0], axis[1], axis[2]).normalized()
+        if (normal dot direction > 0f) normal = normal * -1f // 카메라 쪽을 보게
+        return (eye + direction * hit.distance) to normal
+    }
+
+    /** 조준 링·거리 채우기 */
+    private fun MeasureUiState.withAim(aim: Pair<Vec3, Vec3>?, eye: Vec3, viewProj: FloatArray): MeasureUiState {
+        aim ?: return this
+        val (point, normal) = aim
+        val ref = if (kotlin.math.abs(normal.y) < 0.9f) Vec3.UP else Vec3(1f, 0f, 0f)
+        val u = cross(normal, ref).normalized()
+        val v = cross(normal, u).normalized()
+        val ring = List(RING_SEGMENTS) { i ->
+            val t = (2.0 * Math.PI * i / RING_SEGMENTS).toFloat()
+            point + (u * kotlin.math.cos(t) + v * kotlin.math.sin(t)) * RING_RADIUS_M
+        }.mapNotNull { MeasureGeometry.projectToScreen(it, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) } }
+        return copy(
+            aimRing = if (ring.size == RING_SEGMENTS) ring else emptyList(),
+            aimDistanceCm = ((point - eye).length() * 100f).roundToInt(),
+        )
+    }
+
+    private fun cross(a: Vec3, b: Vec3) = Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
 
     /** 터치 시선 위, 처음 닿는 실제 표면까지의 거리에 있는 지점 */
     private fun surfacePointOnTapRay(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
@@ -411,10 +452,11 @@ class ArMeasureRenderer(
         val project = { p: Vec3 ->
             MeasureGeometry.projectToScreen(p, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) }
         }
+        // 확정된 점으로만 상자를 그리고, 조준점은 노란 미리보기 선으로 따로 보여준다
         val real = anchors.map { it.pose.toVec3() }
         val realTop = heightAnchor?.pose?.toVec3()
-        val placed = real + listOfNotNull(aimBase)
-        val top = realTop ?: aimTop
+        val placed = real
+        val top = realTop
 
         val edges = mutableListOf<ScreenEdge>()
         val labels = mutableListOf<DimLabel>()
@@ -452,6 +494,26 @@ class ArMeasureRenderer(
             }
         }
 
+        // 미리보기 선: 바닥 단계 = 마지막 점 → 조준점(수평 길이), 높이 단계 = 조준점 바로 아래 바닥 → 조준점(높이)
+        val previewLine = when {
+            aimBase != null && real.isNotEmpty() -> {
+                val from = project(real.last())
+                val to = project(aimBase)
+                if (from != null && to != null) {
+                    PreviewLine(from, to, "${(MeasureGeometry.horizontalDistance(real.last(), aimBase) * 100f).roundToInt()} cm")
+                } else {
+                    null
+                }
+            }
+            aimTop != null && real.isNotEmpty() -> {
+                val baseY = real.first().y
+                val from = project(Vec3(aimTop.x, baseY, aimTop.z))
+                val to = project(aimTop)
+                if (from != null && to != null) PreviewLine(from, to, "${((aimTop.y - baseY) * 100f).roundToInt()} cm") else null
+            }
+            else -> null
+        }
+
         // 손잡이: 바닥 점 0..2 + 높이 점(index 3)
         val handles = real.map(project) + List(HEIGHT_HANDLE - real.size) { null } + listOf(realTop?.let(project))
         lastHandles = handles
@@ -469,6 +531,7 @@ class ArMeasureRenderer(
             draggingIndex = draggingPoint?.let { points.indexOf(it) }?.takeIf { it >= 0 },
             edges = edges,
             labels = labels,
+            previewLine = previewLine,
             size = size,
         )
     }
@@ -581,6 +644,10 @@ class ArMeasureRenderer(
         const val TRACKING_LOST_GRACE_MS = 800L
 
         const val TOP_SURFACE_MARGIN_M = 0.05f
+
+        /** 조준 링 반지름 (m)·선분 수 */
+        const val RING_RADIUS_M = 0.035f
+        const val RING_SEGMENTS = 32
 
         /** 원통 둘레를 그릴 때 선분 수 (짝수 — 지름 반대편 점이 정확히 잡히도록) */
         const val RIM_SEGMENTS = 36
