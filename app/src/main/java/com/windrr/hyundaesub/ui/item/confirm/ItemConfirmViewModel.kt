@@ -58,6 +58,10 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
                 it.copy(quantity = (it.quantity + 1).coerceAtMost(ItemConfirmUiState.MAX_QUANTITY))
             }
             ItemConfirmIntent.Decrease -> _state.update { it.copy(quantity = (it.quantity - 1).coerceAtLeast(1)) }
+            is ItemConfirmIntent.AddPhotos -> _state.update {
+                it.copy(photos = (it.photos + intent.uris).distinct().take(ItemConfirmUiState.MAX_PHOTOS))
+            }
+            is ItemConfirmIntent.RemovePhoto -> _state.update { it.copy(photos = it.photos - intent.uri) }
             ItemConfirmIntent.Save -> save()
         }
     }

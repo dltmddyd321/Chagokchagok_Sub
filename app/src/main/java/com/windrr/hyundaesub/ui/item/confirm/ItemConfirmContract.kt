@@ -16,7 +16,11 @@ data class ItemConfirmUiState(
     val quantity: Int = 1,
     /** AR 측정에서 왔는지 (false = 직접 입력) */
     val fromMeasure: Boolean = false,
+    /** 짐 사진 (content:// URI). TODO: 저장 구조 정해지면 내 짐에 함께 저장 */
+    val photos: List<String> = emptyList(),
 ) {
+    val canAddPhoto: Boolean get() = photos.size < MAX_PHOTOS
+
     val widthCm: Int? get() = width.toCmOrNull()
     val depthCm: Int? get() = depth.toCmOrNull()
     val heightCm: Int? get() = height.toCmOrNull()
@@ -28,6 +32,7 @@ data class ItemConfirmUiState(
         /** 차에 실을 수 있는 현실적인 한 변 최대 길이 */
         const val MAX_CM = 300
         const val MAX_QUANTITY = 20
+        const val MAX_PHOTOS = 3
 
         /** AR 측정값(소수 cm) → 화면 값. 작게 재면 안 들어갈 수 있어서 올림 */
         fun fromMeasure(size: BoxSize?): ItemConfirmUiState = ItemConfirmUiState(
@@ -53,6 +58,10 @@ sealed interface ItemConfirmIntent {
     data object Increase : ItemConfirmIntent
 
     data object Decrease : ItemConfirmIntent
+
+    data class AddPhotos(val uris: List<String>) : ItemConfirmIntent
+
+    data class RemovePhoto(val uri: String) : ItemConfirmIntent
 
     data object Save : ItemConfirmIntent
 }
