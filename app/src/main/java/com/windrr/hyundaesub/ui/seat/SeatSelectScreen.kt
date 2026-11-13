@@ -217,7 +217,10 @@ private fun DriverSeat() {
     }
 }
 
-/** 선택 가능한 좌석. 미선택 = 점선 테두리, 선택 = 채움 + 실선 테두리 */
+/**
+ * 선택 가능한 좌석 (시안). 두 상태 모두 흰 점선 테두리.
+ * 미선택 = 반투명 회색 + "좌석", 선택 = 남색 + "탑승".
+ */
 @Composable
 private fun SeatSlot(
     seat: SeatCode,
@@ -225,38 +228,35 @@ private fun SeatSlot(
     onClick: (SeatCode) -> Unit,
 ) {
     val selected = seat in selectedSeats
-    val fill by animateColorAsState(if (selected) SelectedFill else SeatColor, label = "seatFill")
+    val fill by animateColorAsState(if (selected) SelectedFill else UnselectedFill, label = "seatFill")
 
     Box(
         modifier = Modifier
             .size(SeatSize)
             .clip(SeatShape)
             .background(fill)
-            .then(
-                if (selected) {
-                    Modifier.border(2.dp, Color.White, SeatShape)
-                } else {
-                    Modifier.drawBehind {
-                        val radius = 8.dp.toPx()
-                        drawRoundRect(
-                            color = Color.White.copy(alpha = 0.85f),
-                            cornerRadius = CornerRadius(radius, radius),
-                            style = Stroke(
-                                width = 1.5.dp.toPx(),
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
-                            ),
-                        )
-                    }
-                },
-            )
+            .drawBehind {
+                val radius = 8.dp.toPx()
+                val inset = 0.75.dp.toPx()
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.9f),
+                    topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                    size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
+                    cornerRadius = CornerRadius(radius, radius),
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+                    ),
+                )
+            }
             .clickable { onClick(seat) },
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (selected) "✓ 탑승" else "좌석",
+            text = if (selected) "탑승" else "좌석",
             color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -289,7 +289,11 @@ private val SeatSize = 60.dp
 private val SeatShape = RoundedCornerShape(8.dp)
 private val CarBody = Color(0xFF2B2E35)
 private val SeatColor = Color(0xFF4A4E57)
-private val SelectedFill = Color(0xFF3D6BE0)
+/** 선택 좌석: 시안의 남색 (반투명이라 이미지 에셋 위에서도 좌석이 비친다) */
+private val SelectedFill = Color(0xE61D4A86)
+
+/** 미선택 좌석: 반투명 회색 */
+private val UnselectedFill = Color(0xB3707378)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
