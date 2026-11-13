@@ -149,6 +149,8 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                             planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
                             focusMode = Config.FocusMode.AUTO
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            // 표면을 못 찾아도 탭한 자리에 점을 두고, 실제 깊이를 찾으면 보정
+                            instantPlacementMode = Config.InstantPlacementMode.LOCAL_Y_UP
                             if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                                 depthMode = Config.DepthMode.AUTOMATIC
                             }

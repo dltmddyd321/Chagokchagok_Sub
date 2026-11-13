@@ -6,8 +6,10 @@ import android.opengl.Matrix
 import android.os.SystemClock
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Anchor
+import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
+import com.google.ar.core.Point
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -90,8 +92,8 @@ class ArMeasureRenderer(
     private val events = ConcurrentLinkedQueue<TouchEvent>()
     private val anchors = mutableListOf<Anchor>()
     private var heightAnchor: Anchor? = null
-    /** 첫 바닥 점에서 정한 바닥 높이 (월드 y) */
-    private var floorY: Float? = null
+    /** 첫 바닥 점을 찍을 때 정한 바닥 평면. 이후 바닥 점은 이 평면에 붙여 고정한다 */
+    private var floorPlane: Plane? = null
     private var viewWidth = 1
     private var viewHeight = 1
     private var lastUiUpdateMs = 0L
@@ -155,7 +157,7 @@ class ArMeasureRenderer(
             anchors.clear()
             heightAnchor?.detach()
             heightAnchor = null
-            floorY = null
+            floorPlane = null
             events.clear()
             dragIndex = null
             tapMissed = false
@@ -170,7 +172,7 @@ class ArMeasureRenderer(
                 }
                 anchors.isNotEmpty() -> anchors.removeAt(anchors.lastIndex).detach()
             }
-            if (anchors.isEmpty()) floorY = null
+            if (anchors.isEmpty()) floorPlane = null
             dragIndex = null
             tapMissed = false
             badCircle = false
@@ -228,17 +230,18 @@ class ArMeasureRenderer(
     private fun handleTap(frame: Frame, tap: Offset, invViewProj: FloatArray) {
         when (currentStep()) {
             MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> {
-                val point = floorPointAt(frame, tap, invViewProj)
+                val anchor = placeFloorAnchor(frame, tap, invViewProj)
                 tapMissed = false
                 badCircle = false
                 if (shape == MeasureShape.CYLINDER && anchors.size == 2) {
                     val (a, b) = anchors.map { it.pose.toVec3() }
-                    if (!validCircle(a, b, point)) {
+                    if (!validCircle(a, b, anchor.pose.toVec3())) {
+                        anchor.detach()
                         badCircle = true
                         return
                     }
                 }
-                anchors += anchorAt(point)
+                anchors += anchor
             }
             MeasureStep.HEIGHT -> {
                 val top = heightTopAt(frame, tap, invViewProj)
@@ -252,13 +255,16 @@ class ArMeasureRenderer(
     /** 끌기: 바닥 점은 바닥 위에서, 높이 점은 높이만 바뀐다. 인식 못 한 위치면 그대로 둔다 */
     private fun moveHandle(frame: Frame, index: Int, at: Offset, invViewProj: FloatArray) {
         if (index < anchors.size) {
-            val point = floorPointAt(frame, at, invViewProj)
+            val anchor = placeFloorAnchor(frame, at, invViewProj)
             if (shape == MeasureShape.CYLINDER && anchors.size == 3) {
                 val others = anchors.indices.filter { it != index }.map { anchors[it].pose.toVec3() }
-                if (!validCircle(others[0], others[1], point)) return
+                if (!validCircle(others[0], others[1], anchor.pose.toVec3())) {
+                    anchor.detach()
+                    return
+                }
             }
             anchors[index].detach()
-            anchors[index] = anchorAt(point)
+            anchors[index] = anchor
             badCircle = false
         } else if (index == HEIGHT_HANDLE) {
             val top = heightTopAt(frame, at, invViewProj) ?: return
@@ -283,32 +289,50 @@ class ArMeasureRenderer(
     private fun anchorAt(p: Vec3): Anchor = session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
 
     /**
-     * 터치한 곳의 바닥 지점 = 터치 시선과 바닥 평면의 교점. **항상 점을 돌려준다.**
-     * 바닥 높이는 첫 점에서 한 번 정하고 이후 점에 같이 쓴다. 정하는 순서:
-     * 터치한 곳의 수평면 → 인식한 수평면 중 가장 낮은 면 → 터치한 곳의 깊이·특징점 → 폰 높이 기준 추정(1.2m 아래).
-     * 시선이 바닥과 만나지 않으면(위를 향함) 시선 위 1m 지점.
+     * 탭한 곳에 바닥 점을 **실제 표면 깊이로** 고정한다. 항상 앵커를 돌려준다.
+     * 점이 실제 깊이에 있지 않으면 폰을 움직일 때 시차로 물건에서 미끄러져 보이므로, 추정값은 쓰지 않는다.
+     * 1. 바닥 평면이 있으면: 터치 시선과 그 평면의 교점 → 평면에 붙인 앵커 (평면이 다듬어지면 같이 따라감)
+     * 2. 없으면: 터치한 곳의 표면(깊이·특징점) 히트 → 그 지점 앵커
+     * 3. 그것도 없으면: 인스턴트 배치(대략 1m) → ARCore가 실제 깊이를 찾으면 앵커가 그 자리로 옮겨진다
      */
-    private fun floorPointAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3 {
+    private fun placeFloorAnchor(frame: Frame, at: Offset, invViewProj: FloatArray): Anchor {
         val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
-        val y = floorY
-            ?: (horizontalPlaneYAt(frame, at) ?: trackedFloorY() ?: anySurfaceYAt(frame, at) ?: guessedFloorY(frame))
-                .also { floorY = it }
-        return MeasureGeometry.intersectHorizontalPlane(ray, y)
-            ?: (ray.origin + ray.direction.normalized() * FALLBACK_DISTANCE_M)
+        val plane = activeFloorPlane() ?: (floorPlaneAt(frame, at) ?: lowestFloorPlane())?.also { floorPlane = it }
+        if (plane != null) {
+            MeasureGeometry.intersectHorizontalPlane(ray, plane.centerPose.ty())?.let { p ->
+                return plane.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
+            }
+        }
+        frame.hitTest(at.x, at.y).firstOrNull { it.trackable is DepthPoint || it.trackable is Point }
+            ?.let { return it.createAnchor() }
+        frame.hitTestInstantPlacement(at.x, at.y, INSTANT_PLACEMENT_DISTANCE_M).firstOrNull()
+            ?.let { return it.createAnchor() }
+        val p = ray.origin + ray.direction.normalized() * INSTANT_PLACEMENT_DISTANCE_M
+        return session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
     }
 
-    /** 터치한 곳의 아무 표면(깊이·특징점 포함) 높이 */
-    private fun anySurfaceYAt(frame: Frame, at: Offset): Float? =
-        frame.hitTest(at.x, at.y).firstOrNull()?.hitPose?.ty()
+    /** 고정한 바닥 평면 (다른 평면에 합쳐졌으면 합쳐진 평면) */
+    private fun activeFloorPlane(): Plane? {
+        var plane = floorPlane ?: return null
+        while (true) plane = plane.subsumedBy ?: break
+        return plane.takeIf { it.trackingState != TrackingState.STOPPED }?.also { floorPlane = it }
+    }
 
-    /** 아무것도 인식 못 했을 때: 폰이 바닥에서 1.2m쯤 위에 있다고 가정 */
-    private fun guessedFloorY(frame: Frame): Float = frame.camera.pose.ty() - GUESSED_CAMERA_HEIGHT_M
+    /** 탭한 곳에 닿은 위를 향한 수평면 */
+    private fun floorPlaneAt(frame: Frame, at: Offset): Plane? =
+        frame.hitTest(at.x, at.y).firstNotNullOfOrNull { hit ->
+            (hit.trackable as? Plane)?.takeIf { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
+        }
 
-    /** 터치 위치에 닿은 위를 향한 수평면의 높이 (폴리곤 밖이어도 평면 높이는 쓸 수 있다) */
-    private fun horizontalPlaneYAt(frame: Frame, at: Offset): Float? =
-        frame.hitTest(at.x, at.y).firstOrNull {
-            (it.trackable as? Plane)?.type == Plane.Type.HORIZONTAL_UPWARD_FACING
-        }?.hitPose?.ty()
+    /** 인식한 위를 향한 수평면 중 가장 낮은 것 = 바닥 */
+    private fun lowestFloorPlane(): Plane? =
+        session.getAllTrackables(Plane::class.java)
+            .filter {
+                it.trackingState == TrackingState.TRACKING &&
+                    it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+                    it.subsumedBy == null
+            }
+            .minByOrNull { it.centerPose.ty() }
 
     /** 인식한 위를 향한 수평면 중 가장 낮은 것 = 바닥 */
     private fun trackedFloorY(): Float? =
@@ -326,7 +350,7 @@ class ArMeasureRenderer(
      * 노이즈가 큰 특징점·깊이 값은 높이에 쓰지 않는다.
      */
     private fun heightTopAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
-        val baseY = floorY ?: return null
+        val baseY = anchors.firstOrNull()?.pose?.ty() ?: return null
         val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
         val verticals: List<Vec3>
         val insideTop: (Vec3) -> Boolean
@@ -549,10 +573,7 @@ class ArMeasureRenderer(
         /** 원통 반지름 상한 (m). 이보다 크면 잘못 찍은 것으로 본다 */
         const val MAX_RADIUS_M = 1.0f
 
-        /** 바닥을 하나도 인식 못 했을 때 가정하는 폰 높이 (m) */
-        const val GUESSED_CAMERA_HEIGHT_M = 1.2f
-
-        /** 시선이 바닥과 만나지 않을 때 점을 둘 거리 (m) */
-        const val FALLBACK_DISTANCE_M = 1.0f
+        /** 표면을 못 찾았을 때 인스턴트 배치 가정 거리 (m) — ARCore가 실제 깊이로 보정한다 */
+        const val INSTANT_PLACEMENT_DISTANCE_M = 1.0f
     }
 }
