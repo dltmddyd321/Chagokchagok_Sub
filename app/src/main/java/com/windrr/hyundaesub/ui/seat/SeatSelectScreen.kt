@@ -1,5 +1,15 @@
 package com.windrr.hyundaesub.ui.seat
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -150,72 +160,67 @@ private fun BackOnlyTopBar(onBack: () -> Unit) {
 }
 
 /**
- * 임시 차량 실내 평면도. 차량 이미지 에셋 받으면 배경을 Image로 바꾸고
- * 좌석 슬롯은 같은 위치에 겹쳐 올린다.
+ * 아반떼 실내 탑뷰 이미지 위에 좌석 버튼을 올린다.
+ * 이미지(1255×1673px)에서 좌석 부분만 잘라 화면 폭에 맞추고, 좌석 중심 좌표(원본 px)를 같은 비율로 옮긴다.
+ * 운전석은 항상 탑승이라 버튼을 두지 않는다.
  */
 @Composable
 private fun CarTopView(
     selectedSeats: Set<SeatCode>,
     onSeatClick: (SeatCode) -> Unit,
 ) {
-    Box(
+    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_avante_top_view_applied)
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(310.dp)
-            .background(Brush.verticalGradient(listOf(ChagokHeroTop, ChagokNavy))),
-        contentAlignment = Alignment.Center,
-    ) {
-        // 차체 자리
-        Column(
-            modifier = Modifier
-                .width(260.dp)
-                .height(330.dp)
-                .clip(RoundedCornerShape(48.dp))
-                .background(CarBody)
-                .padding(horizontal = 18.dp, vertical = 36.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(36.dp),
-        ) {
-            // 1열: 운전석(고정) · 콘솔 · 조수석
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DriverSeat()
-                Box(
-                    modifier = Modifier
-                        .size(width = 28.dp, height = 60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SeatColor),
+            .aspectRatio(CROP_W.toFloat() / CROP_H)
+            .background(Brush.horizontalGradient(listOf(TopViewBgEdge, TopViewBgCenter, TopViewBgEdge)))
+            .drawBehind {
+                drawImage(
+                    image = image,
+                    srcOffset = IntOffset(CROP_LEFT, CROP_TOP),
+                    srcSize = IntSize(CROP_W, CROP_H),
+                    dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                    filterQuality = FilterQuality.High,
                 )
-                SeatSlot(SeatCode.ROW_1_RIGHT, selectedSeats, onSeatClick)
-            }
-            // 2열
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                SeatSlot(SeatCode.ROW_2_LEFT, selectedSeats, onSeatClick)
-                SeatSlot(SeatCode.ROW_2_CENTER, selectedSeats, onSeatClick)
-                SeatSlot(SeatCode.ROW_2_RIGHT, selectedSeats, onSeatClick)
-            }
+            },
+    ) {
+        val scale = maxWidth / CROP_W.toFloat() // dp per 원본 px
+        val slotSize = scale * SLOT_PX
+        SEAT_CENTERS_PX.forEach { (seat, center) ->
+            SeatSlot(
+                seat = seat,
+                selectedSeats = selectedSeats,
+                onClick = onSeatClick,
+                slotSize = slotSize,
+                modifier = Modifier.offset(
+                    x = scale * (center.first - CROP_LEFT) - slotSize / 2,
+                    y = scale * (center.second - CROP_TOP) - slotSize / 2,
+                ),
+            )
         }
     }
 }
 
-@Composable
-private fun DriverSeat() {
-    Box(
-        modifier = Modifier
-            .size(SeatSize)
-            .clip(SeatShape)
-            .background(SeatColor),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = "운전석", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
-    }
-}
+/** 탑뷰 이미지에서 보여줄 영역 (원본 px): 대시보드 아래 ~ 트렁크 앞 */
+private const val CROP_LEFT = 150
+private const val CROP_TOP = 420
+private const val CROP_W = 955
+private const val CROP_H = 870
+
+/** 좌석 버튼 크기 (원본 px) */
+private const val SLOT_PX = 150f
+
+/** 좌석 쿠션 중심 (원본 px) */
+private val SEAT_CENTERS_PX = listOf(
+    SeatCode.ROW_1_RIGHT to (813f to 705f),
+    SeatCode.ROW_2_LEFT to (440f to 1070f),
+    SeatCode.ROW_2_CENTER to (630f to 1070f),
+    SeatCode.ROW_2_RIGHT to (817f to 1070f),
+)
+
+private val TopViewBgEdge = Color(0xFF0B1A3C)
+private val TopViewBgCenter = Color(0xFF14284F)
 
 /**
  * 선택 가능한 좌석 (시안). 두 상태 모두 흰 점선 테두리.
@@ -226,13 +231,15 @@ private fun SeatSlot(
     seat: SeatCode,
     selectedSeats: Set<SeatCode>,
     onClick: (SeatCode) -> Unit,
+    slotSize: Dp,
+    modifier: Modifier = Modifier,
 ) {
     val selected = seat in selectedSeats
     val fill by animateColorAsState(if (selected) SelectedFill else UnselectedFill, label = "seatFill")
 
     Box(
-        modifier = Modifier
-            .size(SeatSize)
+        modifier = modifier
+            .size(slotSize)
             .clip(SeatShape)
             .background(fill)
             .drawBehind {
@@ -285,10 +292,7 @@ private fun SelectedSeatSummary(count: Int) {
     }
 }
 
-private val SeatSize = 60.dp
 private val SeatShape = RoundedCornerShape(8.dp)
-private val CarBody = Color(0xFF2B2E35)
-private val SeatColor = Color(0xFF4A4E57)
 /** 선택 좌석: 시안의 남색 (반투명이라 이미지 에셋 위에서도 좌석이 비친다) */
 private val SelectedFill = Color(0xE61D4A86)
 

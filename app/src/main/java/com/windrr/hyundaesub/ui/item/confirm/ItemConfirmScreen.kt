@@ -390,11 +390,10 @@ private fun DefaultPhotoThumb() {
             .background(Brush.linearGradient(listOf(Color.White, DefaultPhotoTint))),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_tab_luggage),
+        Image(
+            painter = painterResource(R.drawable.img_luggage_placeholder_applied),
             contentDescription = "기본 이미지",
-            tint = DefaultPhotoIcon,
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(64.dp),
         )
     }
 }

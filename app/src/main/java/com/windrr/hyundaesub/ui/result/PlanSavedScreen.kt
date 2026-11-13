@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.result
 
+import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -92,36 +93,14 @@ fun PlanSavedScreen(
     }
 }
 
-/** 임시 이미지: 은색 차 + 파란 체크 배지. 일러스트 에셋 받으면 Image로 교체 */
+/** 저장 완료 일러스트 (은색 차 + 파란 체크) */
 @Composable
 private fun SavedCarPlaceholder() {
-    Box(modifier = Modifier.size(width = 140.dp, height = 110.dp)) {
-        Icon(
-            painter = painterResource(R.drawable.ic_car),
-            contentDescription = null,
-            tint = CarColor,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(130.dp),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 4.dp, y = 2.dp)
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(BadgeTop, BadgeBottom)))
-                .border(2.dp, Color.White, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_check),
-                contentDescription = "저장됨",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-    }
+    Image(
+        painter = painterResource(R.drawable.img_plan_saved_success_applied),
+        contentDescription = null,
+        modifier = Modifier.size(160.dp),
+    )
 }
 
 private val CarColor = Color(0xFFC9CCD3)

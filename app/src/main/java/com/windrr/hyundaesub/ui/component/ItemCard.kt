@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.component
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -114,11 +115,11 @@ private fun ItemThumbnail() {
             .background(Brush.linearGradient(listOf(Color.White, ThumbnailTint))),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_tab_luggage),
+        // 물건 사진이 없을 때 기본 이미지
+        Image(
+            painter = painterResource(R.drawable.img_luggage_placeholder_applied),
             contentDescription = null,
-            tint = ThumbnailIcon,
-            modifier = Modifier.size(30.dp),
+            modifier = Modifier.size(40.dp),
         )
     }
 }

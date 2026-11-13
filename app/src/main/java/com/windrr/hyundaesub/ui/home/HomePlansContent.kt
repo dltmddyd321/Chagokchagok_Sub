@@ -1,5 +1,7 @@
 package com.windrr.hyundaesub.ui.home
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -121,15 +123,22 @@ private fun HeroSection(recentPlans: List<PlanCardUi>, onNewPlan: () -> Unit) {
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(HeroTop, HeroMiddle, HeroBottom))),
     ) {
-        // 임시 배경 이미지 자리 (트렁크 열린 차 사진 받으면 Image로 교체)
-        Icon(
-            painter = painterResource(R.drawable.ic_car),
+        // 배너 배경 (트렁크 열린 아반떼) + 글씨가 잘 보이도록 위쪽을 어둡게
+        Image(
+            painter = painterResource(R.drawable.img_home_avante_trunk_applied),
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.07f),
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = 60.dp)
-                .size(320.dp),
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(HeroTop.copy(alpha = 0.9f), HeroMiddle.copy(alpha = 0.45f), HeroBottom.copy(alpha = 0.55f)),
+                    ),
+                ),
         )
         Column(modifier = Modifier.statusBarsPadding()) {
             Spacer(Modifier.height(24.dp))

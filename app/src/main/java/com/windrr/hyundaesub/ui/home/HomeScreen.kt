@@ -1,5 +1,7 @@
 package com.windrr.hyundaesub.ui.home
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -145,6 +147,19 @@ private fun HeroCard(onStartClick: () -> Unit) {
             .clip(shape)
             .background(Brush.verticalGradient(listOf(ChagokHeroTop, ChagokHeroBottom))),
     ) {
+        // 배너 이미지 (트렁크 열린 아반떼) + 위쪽 글씨가 잘 보이도록 어둡게
+        Image(
+            painter = painterResource(R.drawable.img_home_avante_trunk_applied),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Brush.verticalGradient(listOf(ChagokHeroTop.copy(alpha = 0.85f), Color.Transparent))),
+        )
         Column(modifier = Modifier.padding(start = 24.dp, top = 28.dp, end = 24.dp)) {
             Text(
                 text = "이 짐, 내 차에\n다 실릴까?",
@@ -160,17 +175,6 @@ private fun HeroCard(onStartClick: () -> Unit) {
                 fontSize = 15.sp,
             )
         }
-
-        // 임시 이미지 자리: 차량 트렁크 사진 받으면 Image(painterResource(...))로 교체
-        Icon(
-            painter = painterResource(R.drawable.ic_car),
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.18f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-                .size(220.dp),
-        )
 
         Box(
             modifier = Modifier

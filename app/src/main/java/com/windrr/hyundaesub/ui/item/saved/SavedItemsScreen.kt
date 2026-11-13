@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.item.saved
 
+import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -192,11 +193,10 @@ private fun EmptyMessage(title: String, body: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_tab_luggage),
+        Image(
+            painter = painterResource(R.drawable.img_luggage_placeholder_applied),
             contentDescription = null,
-            tint = ChagokCardBorder,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(72.dp),
         )
         Spacer(Modifier.height(16.dp))
         Text(text = title, color = ChagokTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
