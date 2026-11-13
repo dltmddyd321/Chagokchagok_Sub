@@ -13,6 +13,7 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Point
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
+import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.windrr.hyundaesub.measure.BoxSize
@@ -35,6 +36,9 @@ enum class MeasureStep {
     DONE,
 }
 
+/** 추적이 안 될 때 이유 (안내 문구용) */
+enum class TrackingIssue { INITIALIZING, LOW_LIGHT, FEW_FEATURES, FAST_MOTION, CAMERA }
+
 /** 화면에 그릴 모서리. measured = 치수를 재는 모서리(가로·세로·높이 / 지름·높이) */
 data class ScreenEdge(val from: Offset, val to: Offset, val measured: Boolean)
 
@@ -45,6 +49,10 @@ data class DimLabel(val at: Offset, val outward: Offset, val text: String)
 data class MeasureUiState(
     /** 추적 상태. 잠깐 끊기는 것은 무시하고 일정 시간 이상 끊겼을 때만 false */
     val tracking: Boolean = false,
+    /** 추적이 안 될 때 이유 */
+    val trackingIssue: TrackingIssue? = TrackingIssue.INITIALIZING,
+    /** 화면 가운데 조준점이 실제 표면(또는 높이)을 가리키는지 */
+    val aimValid: Boolean = false,
     /** 바닥을 한 번이라도 인식했는지 (한 번 찾으면 계속 true) */
     val floorFound: Boolean = false,
     val step: MeasureStep = MeasureStep.POINT_A,
@@ -113,6 +121,11 @@ class ArMeasureRenderer(
 
     fun onTap(x: Float, y: Float) {
         events.add(TouchEvent.Tap(Offset(x, y)))
+    }
+
+    /** "+" 버튼: 화면 가운데 조준점 위치에 점 찍기 */
+    fun captureAtAim() {
+        events.add(TouchEvent.Tap(Offset.Unspecified))
     }
 
     fun onDragStart(x: Float, y: Float) {
@@ -189,6 +202,7 @@ class ArMeasureRenderer(
         // 추적이 잠깐 끊겼다 붙는 것은 안내 문구를 바꾸지 않는다
         lostSinceMs = if (trackingNow) null else lostSinceMs ?: now
         val trackingStable = lostSinceMs?.let { now - it < TRACKING_LOST_GRACE_MS } ?: true
+        val issue = if (trackingNow) null else trackingIssueOf(camera.trackingFailureReason)
         if (!floorFoundLatched) floorFoundLatched = trackedFloorY() != null
 
         val projection = FloatArray(16).also { camera.getProjectionMatrix(it, 0, 0.05f, 100f) }
@@ -196,12 +210,13 @@ class ArMeasureRenderer(
         val viewProj = FloatArray(16).also { Matrix.multiplyMM(it, 0, projection, 0, view, 0) }
         val invViewProj = FloatArray(16).also { Matrix.invertM(it, 0, viewProj, 0) }
 
+        val center = Offset(viewWidth / 2f, viewHeight / 2f)
         var changed = false
         // 추적 전이면 터치를 버리지 않고 다음 프레임까지 기다린다 (끌기 이동만 버림)
         while (trackingNow) {
             val event = events.poll() ?: break
             when (event) {
-                is TouchEvent.Tap -> handleTap(frame, event.at, invViewProj)
+                is TouchEvent.Tap -> handleTap(frame, if (event.at == Offset.Unspecified) center else event.at, invViewProj)
                 is TouchEvent.DragStart -> dragIndex = nearestHandle(event.at)
                 is TouchEvent.DragMove -> dragIndex?.let { moveHandle(frame, it, event.at, invViewProj) }
                 TouchEvent.DragEnd -> dragIndex = null
@@ -212,7 +227,13 @@ class ArMeasureRenderer(
 
         if (!changed && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
         lastUiUpdateMs = now
-        onUpdate(buildState(trackingStable, currentStep(), viewProj))
+
+        // 조준점 미리보기 (삼성 Measure처럼): 다음 바닥 점 또는 높이를 실시간으로
+        val step = currentStep()
+        val aimBase = if (trackingNow && step <= MeasureStep.POINT_C) surfacePointOnTapRay(frame, center, invViewProj) else null
+        val aimTop = if (trackingNow && step == MeasureStep.HEIGHT) heightTopAt(frame, center, invViewProj) else null
+        val state = buildState(trackingStable, step, viewProj, aimBase, aimTop)
+        onUpdate(state.copy(trackingIssue = if (trackingStable) null else issue ?: TrackingIssue.INITIALIZING))
     }
 
     private fun currentStep(): MeasureStep = when {
@@ -368,16 +389,32 @@ class ArMeasureRenderer(
         return MeasureGeometry.rectifyFloorAnyOrder(a, b, c)
     }
 
+    private fun trackingIssueOf(reason: TrackingFailureReason): TrackingIssue = when (reason) {
+        TrackingFailureReason.INSUFFICIENT_LIGHT -> TrackingIssue.LOW_LIGHT
+        TrackingFailureReason.INSUFFICIENT_FEATURES -> TrackingIssue.FEW_FEATURES
+        TrackingFailureReason.EXCESSIVE_MOTION -> TrackingIssue.FAST_MOTION
+        TrackingFailureReason.CAMERA_UNAVAILABLE -> TrackingIssue.CAMERA
+        else -> TrackingIssue.INITIALIZING
+    }
+
+    /**
+     * aimBase/aimTop: 조준점이 가리키는 다음 바닥 점·높이 끝 (미리보기, 아직 찍지 않음).
+     * 미리보기를 찍은 점처럼 넣어 상자·치수를 실시간으로 그린다. 손잡이(끌기)는 실제로 찍은 점만.
+     */
     private fun buildState(
         tracking: Boolean,
         step: MeasureStep,
         viewProj: FloatArray,
+        aimBase: Vec3?,
+        aimTop: Vec3?,
     ): MeasureUiState {
         val project = { p: Vec3 ->
             MeasureGeometry.projectToScreen(p, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) }
         }
-        val placed = anchors.map { it.pose.toVec3() }
-        val top = heightAnchor?.pose?.toVec3()
+        val real = anchors.map { it.pose.toVec3() }
+        val realTop = heightAnchor?.pose?.toVec3()
+        val placed = real + listOfNotNull(aimBase)
+        val top = realTop ?: aimTop
 
         val edges = mutableListOf<ScreenEdge>()
         val labels = mutableListOf<DimLabel>()
@@ -408,18 +445,22 @@ class ArMeasureRenderer(
                 val height = top?.let { it.y - rect.a.y }
                 addBox(rect, height, ::edge, ::label, project, size = { size = it })
             }
-            // 두 점: 순서가 자유라 가로인지 대각선인지 아직 모르므로 선만 잇는다
-            placed.size == 2 -> edge(placed[0], placed[1], measured = false)
+            // 두 점: 길이만 표시 (세 번째 점을 찍어야 가로·세로가 정해진다)
+            placed.size == 2 -> {
+                val line = edge(placed[0], placed[1], measured = true)
+                label(line, MeasureGeometry.horizontalDistance(placed[0], placed[1]), null)
+            }
         }
 
         // 손잡이: 바닥 점 0..2 + 높이 점(index 3)
-        val handles = placed.map(project) + List(HEIGHT_HANDLE - placed.size) { null } + listOf(top?.let(project))
+        val handles = real.map(project) + List(HEIGHT_HANDLE - real.size) { null } + listOf(realTop?.let(project))
         lastHandles = handles
         val points = handles.filterNotNull()
         val draggingPoint = dragIndex?.let { handles.getOrNull(it) }
 
         return MeasureUiState(
             tracking = tracking,
+            aimValid = (aimBase ?: aimTop) != null,
             floorFound = floorFoundLatched,
             step = step,
             tapMissed = tapMissed,

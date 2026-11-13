@@ -70,6 +70,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
+import com.windrr.hyundaesub.ar.TrackingIssue
+import java.util.EnumSet
+import com.google.ar.core.CameraConfigFilter
+import com.google.ar.core.CameraConfig
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
@@ -144,6 +148,9 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                     return null
                 }
                 Session(context).also { s ->
+                    // 30fps 카메라 설정: 60fps에서 영상 처리가 밀려 추적 초기화(VIO)가 계속 실패하던 문제 완화
+                    val fps30 = CameraConfigFilter(s).setTargetFps(EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30))
+                    s.getSupportedCameraConfigs(fps30).firstOrNull()?.let { s.cameraConfig = it }
                     s.configure(
                         Config(s).apply {
                             planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
@@ -151,9 +158,8 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                             // 표면을 못 찾아도 탭한 자리에 점을 두고, 실제 깊이를 찾으면 보정
                             instantPlacementMode = Config.InstantPlacementMode.LOCAL_Y_UP
-                            if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                                depthMode = Config.DepthMode.AUTOMATIC
-                            }
+                            // ML 깊이 추정은 끔: 처리가 밀리며 IMU-카메라 동기화가 깨져 추적이 시작되지 않았음
+                            depthMode = Config.DepthMode.DISABLED
                         },
                     )
                     val r = ArMeasureRenderer(
@@ -287,6 +293,7 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
             ) {
                 drawCornerBrackets()
                 drawMeasureOverlay(uiState, textMeasurer)
+                if (uiState.step != MeasureStep.DONE) drawReticle(uiState.aimValid)
             }
             GuidePill(
                 state = uiState,
@@ -297,38 +304,75 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
             )
         }
 
-        // 하단: 측정 중 = 진행 단계, 완료 = 확인
+        // 하단: 가운데 = 조준점에 점 찍기(+), 오른쪽 = 측정 완료 후 확인
         Box(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .height(132.dp),
-            contentAlignment = Alignment.Center,
+                .height(132.dp)
+                .padding(horizontal = 28.dp),
         ) {
-            if (uiState.step == MeasureStep.DONE) {
-                ShutterButton(
-                    done = true,
-                    enabled = uiState.size.isComplete,
-                    onClick = { if (uiState.size.isComplete) onMeasured(uiState.size) },
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AddPointButton(
+                    enabled = uiState.tracking && uiState.step != MeasureStep.DONE,
+                    onClick = { renderer?.captureAtAim() },
                 )
-            } else {
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "꼭짓점 ${uiState.step.ordinal + 1} / $VERTEX_COUNT",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = if (uiState.step == MeasureStep.DONE) "측정 완료" else "꼭짓점 ${uiState.step.ordinal + 1} / $VERTEX_COUNT",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 12.sp,
+                )
+            }
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                ShutterButton(
+                    done = uiState.step == MeasureStep.DONE,
+                    enabled = uiState.step == MeasureStep.DONE && uiState.size.isComplete,
+                    onClick = { if (uiState.size.isComplete) onMeasured(uiState.size) },
                 )
             }
         }
     }
 }
 
-/**
- * 안내 문구. 우선순위: 추적 끊김(0.8초 이상) → 바닥 미인식 → 직전 터치 실패 → 단계 안내.
- * 단계 안내는 순서를 강요하지 않는다 (꼭짓점은 아무 순서로, 찍은 점은 끌어서 옮길 수 있다).
- */
+/** "+" 버튼: 가운데 조준점 위치에 꼭짓점 찍기 */
+@Composable
+private fun AddPointButton(enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .alpha(if (enabled) 1f else 0.4f)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.18f))
+            .border(2.dp, Color.White, CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = "+", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Light)
+    }
+}
+
+/** 화면 가운데 조준점 (가로선 + X). 실제 표면을 가리키면 진하게 */
+private fun DrawScope.drawReticle(valid: Boolean) {
+    val c = center
+    val color = if (valid) ReticleColor else ReticleColor.copy(alpha = 0.4f)
+    drawLine(color.copy(alpha = 0.6f), Offset(0f, c.y), Offset(size.width, c.y), 1.dp.toPx())
+    val arm = 9.dp.toPx()
+    drawLine(color, c + Offset(-arm, -arm), c + Offset(arm, arm), 2.dp.toPx())
+    drawLine(color, c + Offset(-arm, arm), c + Offset(arm, -arm), 2.dp.toPx())
+}
+
 private fun guideMessage(state: MeasureUiState, shape: MeasureShape): String = when {
-    !state.tracking -> "폰을 천천히 움직여 주세요"
+    !state.tracking -> when (state.trackingIssue) {
+        TrackingIssue.LOW_LIGHT -> "너무 어두워요. 조명을 켜거나 밝은 곳에서 재 주세요"
+        TrackingIssue.FEW_FEATURES -> "바닥 무늬가 잘 안 보여요. 물건과 주변 바닥을 함께 비춰 주세요"
+        TrackingIssue.FAST_MOTION -> "조금 더 천천히 움직여 주세요"
+        TrackingIssue.CAMERA -> "카메라를 쓸 수 없어요. 다른 앱을 닫고 다시 시도해 주세요"
+        else -> "주변을 인식하고 있어요. 물건 주변을 비추며 폰을 천천히 좌우로 움직여 주세요"
+    }
     !state.floorFound && state.step == MeasureStep.POINT_A -> "물건 주변 바닥을 비추며 폰을 천천히 움직여 주세요"
     state.tapMissed -> "그 위치를 인식하지 못했어요. 바닥이나 물건 가장자리를 다시 터치해 주세요"
     state.badCircle -> "세 점이 한 줄에 가까워요. 둘레를 따라 서로 떨어진 곳을 터치해 주세요"
@@ -338,7 +382,7 @@ private fun guideMessage(state: MeasureUiState, shape: MeasureShape): String = w
 
 /** 네모: 바닥 꼭짓점 아무 순서로 세 개 → 윗면 꼭짓점 하나 */
 private fun boxGuide(step: MeasureStep): String = when (step) {
-    MeasureStep.POINT_A -> "물건 바닥 꼭짓점 하나를 터치하세요"
+    MeasureStep.POINT_A -> "가운데 표시를 바닥 꼭짓점에 맞추고 + 를 누르세요 (직접 터치도 돼요)"
     MeasureStep.POINT_B -> "바닥 꼭짓점을 하나 더 터치하세요"
     MeasureStep.POINT_C -> "바닥 꼭짓점을 하나 더 터치하세요 (순서는 상관없어요)"
     MeasureStep.HEIGHT -> "물건 윗면 꼭짓점을 터치하세요 · 찍은 점은 끌어서 옮길 수 있어요"
@@ -455,6 +499,7 @@ private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: Te
 
 private val DoneText = Color(0xFF05082B)
 private val DragRing = Color(0xFF3D7BFF)
+private val ReticleColor = Color(0xFF3D7BFF)
 
 private const val VERTEX_COUNT = 4
 
