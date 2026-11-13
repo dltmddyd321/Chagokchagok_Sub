@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Anchor
 import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.Point
 import com.google.ar.core.Pose
@@ -92,8 +93,6 @@ class ArMeasureRenderer(
     private val events = ConcurrentLinkedQueue<TouchEvent>()
     private val anchors = mutableListOf<Anchor>()
     private var heightAnchor: Anchor? = null
-    /** 첫 바닥 점을 찍을 때 정한 바닥 평면. 이후 바닥 점은 이 평면에 붙여 고정한다 */
-    private var floorPlane: Plane? = null
     private var viewWidth = 1
     private var viewHeight = 1
     private var lastUiUpdateMs = 0L
@@ -157,7 +156,6 @@ class ArMeasureRenderer(
             anchors.clear()
             heightAnchor?.detach()
             heightAnchor = null
-            floorPlane = null
             events.clear()
             dragIndex = null
             tapMissed = false
@@ -172,7 +170,6 @@ class ArMeasureRenderer(
                 }
                 anchors.isNotEmpty() -> anchors.removeAt(anchors.lastIndex).detach()
             }
-            if (anchors.isEmpty()) floorPlane = null
             dragIndex = null
             tapMissed = false
             badCircle = false
@@ -289,50 +286,33 @@ class ArMeasureRenderer(
     private fun anchorAt(p: Vec3): Anchor = session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
 
     /**
-     * 탭한 곳에 바닥 점을 **실제 표면 깊이로** 고정한다. 항상 앵커를 돌려준다.
-     * 점이 실제 깊이에 있지 않으면 폰을 움직일 때 시차로 물건에서 미끄러져 보이므로, 추정값은 쓰지 않는다.
-     * 1. 바닥 평면이 있으면: 터치 시선과 그 평면의 교점 → 평면에 붙인 앵커 (평면이 다듬어지면 같이 따라감)
-     * 2. 없으면: 터치한 곳의 표면(깊이·특징점) 히트 → 그 지점 앵커
-     * 3. 그것도 없으면: 인스턴트 배치(대략 1m) → ARCore가 실제 깊이를 찾으면 앵커가 그 자리로 옮겨진다
+     * 탭한 곳에 점을 고정한다 (회사에서 잘 되던 79d95d6 방식 복구). 항상 앵커를 돌려준다.
+     * - 터치 시선에서 처음 닿는 실제 표면(평면 안쪽·깊이·특징점)까지의 거리만큼 시선 위에 점을 둔다.
+     *   → 점이 손가락 바로 아래, 실제로 닿은 깊이에 있어서 폰을 움직여도 그 자리에 붙어 있다.
+     * - 표면을 하나도 못 찾았을 때만 인스턴트 배치(ARCore가 실제 깊이로 보정)
      */
     private fun placeFloorAnchor(frame: Frame, at: Offset, invViewProj: FloatArray): Anchor {
-        val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
-        val plane = activeFloorPlane() ?: (floorPlaneAt(frame, at) ?: lowestFloorPlane())?.also { floorPlane = it }
-        if (plane != null) {
-            MeasureGeometry.intersectHorizontalPlane(ray, plane.centerPose.ty())?.let { p ->
-                return plane.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
-            }
-        }
-        frame.hitTest(at.x, at.y).firstOrNull { it.trackable is DepthPoint || it.trackable is Point }
-            ?.let { return it.createAnchor() }
+        surfacePointOnTapRay(frame, at, invViewProj)?.let { return anchorAt(it) }
         frame.hitTestInstantPlacement(at.x, at.y, INSTANT_PLACEMENT_DISTANCE_M).firstOrNull()
             ?.let { return it.createAnchor() }
-        val p = ray.origin + ray.direction.normalized() * INSTANT_PLACEMENT_DISTANCE_M
-        return session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
+        val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
+        return anchorAt(ray.origin + ray.direction.normalized() * INSTANT_PLACEMENT_DISTANCE_M)
     }
 
-    /** 고정한 바닥 평면 (다른 평면에 합쳐졌으면 합쳐진 평면) */
-    private fun activeFloorPlane(): Plane? {
-        var plane = floorPlane ?: return null
-        while (true) plane = plane.subsumedBy ?: break
-        return plane.takeIf { it.trackingState != TrackingState.STOPPED }?.also { floorPlane = it }
+    /** 터치 시선 위, 처음 닿는 실제 표면까지의 거리에 있는 지점 */
+    private fun surfacePointOnTapRay(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
+        val hit = frame.hitTest(at.x, at.y).firstOrNull { it.isOnSurface() } ?: return null
+        val eye = frame.camera.pose.toVec3()
+        val direction = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj).direction
+        return eye + direction.normalized() * hit.distance
     }
 
-    /** 탭한 곳에 닿은 위를 향한 수평면 */
-    private fun floorPlaneAt(frame: Frame, at: Offset): Plane? =
-        frame.hitTest(at.x, at.y).firstNotNullOfOrNull { hit ->
-            (hit.trackable as? Plane)?.takeIf { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
-        }
-
-    /** 인식한 위를 향한 수평면 중 가장 낮은 것 = 바닥 */
-    private fun lowestFloorPlane(): Plane? =
-        session.getAllTrackables(Plane::class.java)
-            .filter {
-                it.trackingState == TrackingState.TRACKING &&
-                    it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
-                    it.subsumedBy == null
-            }
-            .minByOrNull { it.centerPose.ty() }
+    private fun HitResult.isOnSurface(): Boolean = when (val target = trackable) {
+        is Plane -> target.isPoseInPolygon(hitPose)
+        is DepthPoint -> true
+        is Point -> true
+        else -> false
+    }
 
     /** 인식한 위를 향한 수평면 중 가장 낮은 것 = 바닥 */
     private fun trackedFloorY(): Float? =
@@ -363,12 +343,9 @@ class ArMeasureRenderer(
             verticals = rect.corners
             insideTop = { rect.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
         }
-        val onTopPlane = frame.hitTest(at.x, at.y).firstOrNull {
-            val plane = it.trackable as? Plane
-            plane != null &&
-                plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
-                it.hitPose.ty() - baseY >= MIN_HEIGHT_M
-        }?.hitPose?.toVec3()?.takeIf(insideTop)
+        // 물건 윗면을 찍었으면 그 지점 (회사 버전과 동일), 아니면 수직선 기준
+        val onTopPlane = surfacePointOnTapRay(frame, at, invViewProj)
+            ?.takeIf { insideTop(it) && it.y - baseY >= MIN_HEIGHT_M }
         val top = onTopPlane
             ?: MeasureGeometry.topOnNearestVertical(verticals, ray)
             // 수직선과 만나지 않으면(거의 위에서 내려다봄) 시선이 바닥 중심 위를 지나는 높이로 근사
