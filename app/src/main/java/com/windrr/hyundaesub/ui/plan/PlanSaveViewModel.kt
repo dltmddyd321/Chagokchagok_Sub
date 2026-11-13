@@ -23,9 +23,7 @@ class PlanSaveViewModel : ViewModel() {
             is PlanSaveIntent.NameChanged -> _state.update {
                 it.copy(name = intent.name.replace("\n", "").take(PlanSaveUiState.MAX_NAME_LENGTH))
             }
-            is PlanSaveIntent.SelectCategory -> _state.update {
-                it.copy(category = if (it.category == intent.category) null else intent.category)
-            }
+            is PlanSaveIntent.SelectCategory -> _state.update { it.copy(category = intent.category) }
             is PlanSaveIntent.MemoChanged -> _state.update {
                 it.copy(memo = intent.memo.take(PlanSaveUiState.MAX_MEMO_LENGTH))
             }

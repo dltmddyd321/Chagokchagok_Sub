@@ -114,7 +114,7 @@ fun PlanSaveScreen(
 
                 SectionLabel("카테고리")
             }
-            // 칩은 화면 끝까지 가로 스크롤 (시안: 앞의 세 개가 한 줄에 보임)
+            // 서버 카테고리 3종 (넘치는 화면에서도 잘리지 않게 가로 스크롤)
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

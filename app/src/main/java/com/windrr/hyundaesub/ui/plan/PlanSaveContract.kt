@@ -4,10 +4,11 @@ import com.windrr.hyundaesub.data.local.entity.PlanCategory
 
 data class PlanSaveUiState(
     val name: String = "",
-    val category: PlanCategory? = null,
+    /** 항상 하나 선택, 기본 여행 */
+    val category: PlanCategory = PlanCategory.DEFAULT,
     val memo: String = "",
 ) {
-    /** 이름만 필수. 카테고리·메모는 선택 */
+    /** 이름만 필수 (카테고리는 항상 선택돼 있고, 메모는 선택) */
     val canSave: Boolean get() = name.isNotBlank()
 
     companion object {
@@ -19,7 +20,7 @@ data class PlanSaveUiState(
 sealed interface PlanSaveIntent {
     data class NameChanged(val name: String) : PlanSaveIntent
 
-    /** 같은 칩을 다시 누르면 선택 해제 */
+    /** 하나만 선택 (다시 눌러도 해제되지 않음) */
     data class SelectCategory(val category: PlanCategory) : PlanSaveIntent
 
     data class MemoChanged(val memo: String) : PlanSaveIntent
@@ -30,7 +31,7 @@ sealed interface PlanSaveIntent {
 /** 저장할 계획 정보 (짐·좌석·차량은 상위 흐름이 들고 있다) */
 data class PlanMeta(
     val name: String,
-    val category: PlanCategory?,
+    val category: PlanCategory,
     /** 비어 있으면 null */
     val memo: String?,
 )

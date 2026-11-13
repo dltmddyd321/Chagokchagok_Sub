@@ -311,7 +311,7 @@ private fun FavoritePlanCard(plan: PlanCardUi, onStarClick: () -> Unit) {
             }
             Spacer(Modifier.width(6.dp))
             Text(
-                text = plan.category?.label ?: PlanCategory.ETC.label,
+                text = plan.category.label,
                 color = ChagokTextSecondary,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -356,10 +356,10 @@ private fun FavoritePlanCard(plan: PlanCardUi, onStarClick: () -> Unit) {
     }
 }
 
-private fun PlanCategory?.placeholderIcon(): Int = when (this) {
-    PlanCategory.TRAVEL, PlanCategory.OUTING -> R.drawable.ic_car
-    PlanCategory.LEISURE, PlanCategory.MOVING -> R.drawable.ic_tab_luggage
-    else -> R.drawable.ic_tab_plan
+private fun PlanCategory.placeholderIcon(): Int = when (this) {
+    PlanCategory.TRAVEL -> R.drawable.ic_car
+    PlanCategory.LEISURE -> R.drawable.ic_tab_luggage
+    PlanCategory.MOVING -> R.drawable.ic_tab_plan
 }
 
 private val HeroTop = Color(0xFF1A3263)
@@ -392,8 +392,8 @@ private fun HomePlansContentPreview() {
             state = HomeUiState(
                 isLoading = false,
                 recentPlans = listOf(
-                    sample("1", "주말 나들이", PlanCategory.OUTING, "D-3", false),
-                    sample("2", "이케아", PlanCategory.SHOPPING, "D-6", false),
+                    sample("1", "주말 나들이", PlanCategory.TRAVEL, "D-3", false),
+                    sample("2", "이케아", PlanCategory.MOVING, "D-6", false),
                 ),
                 favoritePlans = listOf(
                     sample("3", "가족 캠핑", PlanCategory.TRAVEL, null, true),

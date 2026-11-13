@@ -31,8 +31,8 @@ data class PlanEntity(
     val memo: String? = null,
     /** 계획 이름 (예: "주말 나들이") */
     val name: String = "",
-    /** 분류. 정하지 않았으면 null */
-    val category: PlanCategory? = null,
+    /** 카테고리. 항상 있음, 기본 여행 */
+    val category: PlanCategory = PlanCategory.DEFAULT,
     /** 출발 날짜 "yyyy-MM-dd" (D-day 표시용). 정하지 않았으면 null */
     @ColumnInfo(name = "trip_date")
     val tripDate: String? = null,

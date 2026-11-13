@@ -2,6 +2,7 @@ package com.windrr.hyundaesub.data.local.converter
 
 import androidx.room.TypeConverter
 import com.windrr.hyundaesub.data.local.entity.Orientation
+import com.windrr.hyundaesub.data.local.entity.PlanCategory
 import com.windrr.hyundaesub.data.local.entity.SeatCode
 import org.json.JSONArray
 
@@ -31,4 +32,11 @@ class Converters {
     @TypeConverter
     fun jsonToOrientations(value: String): List<Orientation> =
         Orientation.normalizeAllowed(jsonToStrings(value).mapNotNull { name -> Orientation.entries.find { it.name == name } })
+
+    /** 카테고리: 모르는 값·빈 값이 들어 있어도 크래시 없이 여행으로 */
+    @TypeConverter
+    fun categoryToCode(value: PlanCategory): String = value.name
+
+    @TypeConverter
+    fun codeToCategory(value: String?): PlanCategory = PlanCategory.fromCode(value)
 }

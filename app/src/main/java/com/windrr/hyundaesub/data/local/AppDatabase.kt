@@ -49,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         /** 스키마 버전. 출시 전이라 올리면 기존 로컬 데이터는 지워진다 */
-        const val VERSION = 6
+        const val VERSION = 7
 
         private const val NAME = "load_plan.db"
 

@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit
 data class PlanCardUi(
     val planId: String,
     val name: String,
-    val category: PlanCategory?,
+    val category: PlanCategory,
     /** "D-3", "D-DAY". 날짜가 없거나 지났으면 null */
     val dDay: String?,
     /** 최근 계획 카드용: "유모차 1 · 캐리어 1 · 캠핑의자 2" */
