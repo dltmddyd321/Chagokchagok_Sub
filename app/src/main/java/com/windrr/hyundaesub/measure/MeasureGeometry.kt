@@ -34,6 +34,18 @@ data class FloorRect(val a: Vec3, val b: Vec3, val c: Vec3, val d: Vec3) {
     /** B→C 수평 길이 (m) */
     val depth: Float get() = MeasureGeometry.horizontalDistance(b, c)
 
+    fun containsHorizontally(p: Vec3, margin: Float): Boolean {
+        val ab = b - a
+        val ad = d - a
+        val abLength = ab.length()
+        val adLength = ad.length()
+        if (abLength < MeasureGeometry.MIN_EDGE_M || adLength < MeasureGeometry.MIN_EDGE_M) return false
+        val rel = Vec3(p.x - a.x, 0f, p.z - a.z)
+        val u = (rel dot ab) / abLength
+        val v = (rel dot ad) / adLength
+        return u in -margin..(abLength + margin) && v in -margin..(adLength + margin)
+    }
+
     /** 같은 바닥 꼭짓점을 height(m)만큼 올린 윗면 */
     fun top(height: Float): List<Vec3> = corners.map { it + Vec3.UP * height }
 }
@@ -71,14 +83,20 @@ object MeasureGeometry {
     }
 
     /** 바닥 직사각형을 정하기에 너무 짧은 변 (m) */
-    private const val MIN_EDGE_M = 0.005f
+    const val MIN_EDGE_M = 0.005f
 
     /**
      * base에서 위로 세운 수직선과 카메라 시선이 가장 가까워지는 지점의 높이(m).
      * 깊이 센서 없이 "시선 ↔ 수직선" 교차로 높이를 구한다.
      * 시선이 수직선과 거의 평행하거나, 카메라 뒤쪽·바닥 아래를 가리키면 null.
      */
-    fun heightAlongVertical(base: Vec3, ray: Ray): Float? {
+    fun heightAlongVertical(base: Vec3, ray: Ray): Float? = verticalApproach(base, ray)?.first
+
+    fun topOnNearestVertical(bases: List<Vec3>, ray: Ray): Vec3? =
+        bases.mapNotNull { base -> verticalApproach(base, ray)?.let { (height, gap) -> base + Vec3.UP * height to gap } }
+            .minByOrNull { it.second }?.first
+
+    private fun verticalApproach(base: Vec3, ray: Ray): Pair<Float, Float>? {
         val u = Vec3.UP
         val v = ray.direction.normalized()
         val w0 = base - ray.origin
@@ -89,7 +107,10 @@ object MeasureGeometry {
         val e = v dot w0
         val t = (b * e - d) / denom // 수직선 위 위치 = 높이
         val s = (e - b * d) / denom // 시선 위 위치 (양수 = 카메라 앞)
-        return if (t > 0f && s > 0f) t else null
+        if (t <= 0f || s <= 0f) return null
+        val onVertical = base + u * t
+        val onRay = ray.origin + v * s
+        return t to (onVertical - onRay).length()
     }
 
     /**

@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -140,6 +140,9 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
                             planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
                             focusMode = Config.FocusMode.AUTO
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                                depthMode = Config.DepthMode.AUTOMATIC
+                            }
                         },
                     )
                     val r = ArMeasureRenderer(s, { glView.display?.rotation ?: 0 }) { state ->
@@ -242,7 +245,10 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
         ) {
             // 렌더러 연결 전에 GLSurfaceView가 붙으면 surfaceCreated에서 크래시 → 세션 준비 후에만 표시
             if (renderer != null) {
-                AndroidView(factory = { glView }, modifier = Modifier.fillMaxSize())
+                AndroidView(
+                    factory = { glView.apply { doOnLayout { view -> view.post { view.requestLayout() } } } },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
             Canvas(
                 Modifier
@@ -253,7 +259,6 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
             ) {
                 drawCornerBrackets()
                 drawMeasureOverlay(uiState, textMeasurer)
-                if (uiState.step != MeasureStep.DONE) drawAim(uiState.aimValid)
             }
             GuidePill(
                 state = uiState,
@@ -263,7 +268,7 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
             )
         }
 
-        // 하단: 셔터 (측정 중 = 조준점에 점 찍기, 완료 = 짐에 담기)
+        // 하단: 측정 중 = 진행 단계, 완료 = 확인
         Box(
             Modifier
                 .fillMaxWidth()
@@ -271,29 +276,32 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
                 .height(132.dp),
             contentAlignment = Alignment.Center,
         ) {
-            ShutterButton(
-                done = uiState.step == MeasureStep.DONE,
-                enabled = uiState.canCapture,
-                onClick = {
-                    if (uiState.step == MeasureStep.DONE) {
-                        if (uiState.size.isComplete) onMeasured(uiState.size)
-                    } else {
-                        renderer?.captureAtAim()
-                    }
-                },
-            )
+            if (uiState.step == MeasureStep.DONE) {
+                ShutterButton(
+                    done = true,
+                    enabled = uiState.size.isComplete,
+                    onClick = { if (uiState.size.isComplete) onMeasured(uiState.size) },
+                )
+            } else {
+                Text(
+                    text = "꼭짓점 ${uiState.step.ordinal + 1} / $VERTEX_COUNT",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
 
 private fun guideMessage(state: MeasureUiState): String = when {
     !state.tracking -> "폰을 천천히 움직여 주세요"
-    !state.floorFound -> "바닥을 비추며 폰을 좌우로 천천히 움직여 주세요"
-    state.step == MeasureStep.POINT_A -> "가운데 원을 물건 바깥쪽 바닥 모서리에 맞추고 셔터를 누르세요"
-    state.step == MeasureStep.POINT_B -> "가로 끝 모서리에 맞추고 셔터를 누르세요"
-    state.step == MeasureStep.POINT_C -> "세로 끝 모서리에 맞추고 셔터를 누르세요"
-    state.step == MeasureStep.HEIGHT -> "가운데 원을 물건의 가장 높은 곳에 맞추고 셔터를 누르세요"
-    else -> "셔터를 누르면 측정값을 확인할 수 있어요"
+    state.tapMissed -> "그 위치를 인식하지 못했어요. 폰을 조금 움직인 뒤 다시 터치해 주세요"
+    state.step == MeasureStep.POINT_A -> "물건 바닥의 왼쪽 앞 꼭짓점을 터치하세요"
+    state.step == MeasureStep.POINT_B -> "물건 바닥의 오른쪽 앞 꼭짓점을 터치하세요"
+    state.step == MeasureStep.POINT_C -> "물건 바닥의 오른쪽 뒤 꼭짓점을 터치하세요"
+    state.step == MeasureStep.HEIGHT -> "물건 윗면의 꼭짓점 하나를 터치하세요"
+    else -> "측정이 끝났어요. 확인을 눌러 주세요"
 }
 
 @Composable
@@ -353,15 +361,6 @@ private fun DrawScope.drawCornerBrackets() {
     corner(r, b, -1f, -1f)
 }
 
-/** 화면 가운데 조준점. 찍을 수 있는 곳이면 진하게 */
-private fun DrawScope.drawAim(valid: Boolean) {
-    val c = center
-    val color = if (valid) Color.White else Color.White.copy(alpha = 0.45f)
-    drawCircle(Color.Black.copy(alpha = 0.25f), radius = 16.dp.toPx(), center = c, style = Stroke(4.dp.toPx()))
-    drawCircle(color, radius = 16.dp.toPx(), center = c, style = Stroke(2.dp.toPx()))
-    drawCircle(color, radius = 3.dp.toPx(), center = c)
-}
-
 /** 직육면체 점선 + 치수 라벨 + 찍은 점 */
 private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: TextMeasurer) {
     val measuredDash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))
@@ -379,7 +378,6 @@ private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: Te
         drawCircle(Color.Black.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = p)
         drawCircle(Color.White, radius = 7.dp.toPx(), center = p)
     }
-    state.aimPoint?.let { p -> drawCircle(Color.White.copy(alpha = 0.8f), radius = 5.dp.toPx(), center = p) }
 
     val style = TextStyle(
         color = Color.White,
@@ -399,6 +397,8 @@ private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: Te
 }
 
 private val DoneText = Color(0xFF05082B)
+
+private const val VERTEX_COUNT = 4
 
 @Composable
 private fun MessageScreen(message: String, onBack: () -> Unit) {

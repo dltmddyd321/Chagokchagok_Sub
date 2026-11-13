@@ -3,10 +3,14 @@ package com.windrr.hyundaesub.ar
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.os.SystemClock
 import androidx.compose.ui.geometry.Offset
 import com.google.ar.core.Anchor
+import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
+import com.google.ar.core.Point
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -47,12 +51,8 @@ data class DimLabel(val at: Offset, val outward: Offset, val text: String)
 /** 화면에 보여줄 측정 상태 (GL 스레드에서 매 프레임 생성) */
 data class MeasureUiState(
     val tracking: Boolean = false,
-    val floorFound: Boolean = false,
     val step: MeasureStep = MeasureStep.POINT_A,
-    /** 화면 가운데 조준점이 지금 찍을 수 있는 곳(바닥 / 높이)을 가리키는지 */
-    val aimValid: Boolean = false,
-    /** 조준점이 가리키는 지점의 화면 좌표 (미리보기 점) */
-    val aimPoint: Offset? = null,
+    val tapMissed: Boolean = false,
     /** 확정된 점 (바닥 꼭짓점, 높이 끝) */
     val points: List<Offset> = emptyList(),
     /** 직육면체 모서리 (확정 + 실시간 미리보기) */
@@ -60,9 +60,7 @@ data class MeasureUiState(
     val labels: List<DimLabel> = emptyList(),
     /** 현재 치수 (확정값, 없으면 실시간 미리보기 값) */
     val size: BoxSize = BoxSize(null, null, null),
-) {
-    val canCapture: Boolean get() = tracking && (step == MeasureStep.DONE || aimValid)
-}
+)
 
 /**
  * 점 찍기 + 실시간 직육면체 측정.
@@ -80,9 +78,11 @@ class ArMeasureRenderer(
     private val background = CameraBackgroundRenderer()
     private val taps = ConcurrentLinkedQueue<Offset>()
     private val anchors = mutableListOf<Anchor>()
-    private var heightM: Float? = null
+    private var heightAnchor: Anchor? = null
     private var viewWidth = 1
     private var viewHeight = 1
+    private var lastUiUpdateMs = 0L
+    private var tapMissed = false
 
     @Volatile
     private var resetRequested = false
@@ -93,11 +93,6 @@ class ArMeasureRenderer(
     /** 화면 탭 위치에 점 찍기 */
     fun onTap(x: Float, y: Float) {
         taps.add(Offset(x, y))
-    }
-
-    /** 셔터: 화면 가운데 조준점 위치에 점 찍기 */
-    fun captureAtAim() {
-        taps.add(Offset.Unspecified)
     }
 
     /** 마지막 단계 되돌리기 (높이 → C → B → A 순) */
@@ -127,15 +122,21 @@ class ArMeasureRenderer(
         if (resetRequested) {
             anchors.forEach { it.detach() }
             anchors.clear()
-            heightM = null
+            heightAnchor?.detach()
+            heightAnchor = null
             taps.clear()
+            tapMissed = false
             resetRequested = false
         }
         if (undoRequested) {
             when {
-                heightM != null -> heightM = null
+                heightAnchor != null -> {
+                    heightAnchor?.detach()
+                    heightAnchor = null
+                }
                 anchors.isNotEmpty() -> anchors.removeAt(anchors.lastIndex).detach()
             }
+            tapMissed = false
             undoRequested = false
         }
 
@@ -148,83 +149,95 @@ class ArMeasureRenderer(
 
         val camera = frame.camera
         val tracking = camera.trackingState == TrackingState.TRACKING
-        val floorFound = session.getAllTrackables(Plane::class.java).any {
-            it.trackingState == TrackingState.TRACKING &&
-                it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
-                it.subsumedBy == null
-        }
-
         val projection = FloatArray(16).also { camera.getProjectionMatrix(it, 0, 0.05f, 100f) }
         val view = FloatArray(16).also { camera.getViewMatrix(it, 0) }
         val viewProj = FloatArray(16).also { Matrix.multiplyMM(it, 0, projection, 0, view, 0) }
         val invViewProj = FloatArray(16).also { Matrix.invertM(it, 0, viewProj, 0) }
-        val center = Offset(viewWidth / 2f, viewHeight / 2f)
-
+        var stepChanged = false
         while (true) {
             val tap = taps.poll() ?: break
-            if (tracking) handleTap(frame, if (tap == Offset.Unspecified) center else tap, invViewProj)
+            if (tracking) {
+                handleTap(frame, tap, invViewProj)
+                stepChanged = true
+            }
         }
 
-        // 조준점 미리보기: 바닥 단계는 바닥 위 지점, 높이 단계는 높이 값
-        val step = currentStep()
-        val aimFloor = if (tracking && step <= MeasureStep.POINT_C) hitFloor(frame, center)?.toVec3() else null
-        val aimHeight = if (tracking && step == MeasureStep.HEIGHT) heightAt(center, invViewProj) else null
+        val now = SystemClock.elapsedRealtime()
+        if (!stepChanged && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
+        lastUiUpdateMs = now
 
-        onUpdate(buildState(tracking, floorFound, step, aimFloor, aimHeight, viewProj))
+        onUpdate(buildState(tracking, currentStep(), viewProj))
     }
 
     private fun currentStep(): MeasureStep = when {
         anchors.size == 0 -> MeasureStep.POINT_A
         anchors.size == 1 -> MeasureStep.POINT_B
         anchors.size == 2 -> MeasureStep.POINT_C
-        heightM == null -> MeasureStep.HEIGHT
+        heightAnchor == null -> MeasureStep.HEIGHT
         else -> MeasureStep.DONE
     }
 
     private fun handleTap(frame: Frame, tap: Offset, invViewProj: FloatArray) {
         when (currentStep()) {
             MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> {
-                val hit = frame.hitTest(tap.x, tap.y).firstOrNull { it.isOnFloor() } ?: return
-                anchors += hit.createAnchor()
+                val point = surfacePointOnTapRay(frame, tap, invViewProj)
+                tapMissed = point == null
+                point?.let { anchors += session.createAnchor(Pose.makeTranslation(it.x, it.y, it.z)) }
             }
-            MeasureStep.HEIGHT -> heightM = heightAt(tap, invViewProj)
+            MeasureStep.HEIGHT -> {
+                val top = heightTopAt(frame, tap, invViewProj)
+                tapMissed = top == null
+                heightAnchor = top?.let { session.createAnchor(Pose.makeTranslation(it.x, it.y, it.z)) }
+            }
             MeasureStep.DONE -> Unit
         }
     }
 
-    /** 위를 향한 수평면(바닥)에 닿은 지점 */
-    private fun hitFloor(frame: Frame, at: Offset): Pose? =
-        frame.hitTest(at.x, at.y).firstOrNull { it.isOnFloor() }?.hitPose
-
-    private fun com.google.ar.core.HitResult.isOnFloor(): Boolean {
-        val plane = trackable as? Plane ?: return false
-        return plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING && plane.isPoseInPolygon(hitPose)
+    /** 터치한 화면 위치의 시선 위에서, 가장 가까운 표면(평면·깊이·특징점)까지의 거리에 있는 지점 */
+    private fun surfacePointOnTapRay(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
+        val hit = frame.hitTest(at.x, at.y).firstOrNull { it.isOnSurface() } ?: return null
+        val eye = frame.camera.pose.toVec3()
+        val direction = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj).direction
+        return eye + direction * hit.distance
     }
 
-    /** 화면 위치의 시선이 A 위 수직선과 만나는 높이 (m) */
-    private fun heightAt(at: Offset, invViewProj: FloatArray): Float? {
-        val base = anchors.firstOrNull()?.pose?.toVec3() ?: return null
-        val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
-        return MeasureGeometry.heightAlongVertical(base, ray)?.takeIf { it >= MIN_HEIGHT_M }
+    private fun HitResult.isOnSurface(): Boolean = when (val target = trackable) {
+        is Plane -> target.isPoseInPolygon(hitPose)
+        is DepthPoint -> true
+        is Point -> true
+        else -> false
+    }
+
+    /**
+     * 높이 끝점. 터치한 곳이 바닥 직사각형 위쪽 표면(물건 윗면)이면 그 지점을 쓰고,
+     * 아니면 바닥 네 꼭짓점의 수직선 중 시선과 가장 가까운 수직선 위 지점을 쓴다.
+     */
+    private fun heightTopAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
+        val rect = floorRect() ?: return null
+        val top = surfacePointOnTapRay(frame, at, invViewProj)
+            ?.takeIf { rect.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
+            ?: MeasureGeometry.topOnNearestVertical(
+                rect.corners,
+                MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj),
+            )
+        return top?.takeIf { it.y - rect.a.y >= MIN_HEIGHT_M }
+    }
+
+    private fun floorRect(): FloorRect? {
+        if (anchors.size < 3) return null
+        val (a, b, c) = anchors.take(3).map { it.pose.toVec3() }
+        return MeasureGeometry.rectifyFloor(a, b, c)
     }
 
     private fun buildState(
         tracking: Boolean,
-        floorFound: Boolean,
         step: MeasureStep,
-        aimFloor: Vec3?,
-        aimHeight: Float?,
         viewProj: FloatArray,
     ): MeasureUiState {
         val project = { p: Vec3 ->
             MeasureGeometry.projectToScreen(p, viewProj, viewWidth, viewHeight)?.let { (x, y) -> Offset(x, y) }
         }
         val placed = anchors.map { it.pose.toVec3() }
-        val aimValid = when (step) {
-            MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> aimFloor != null
-            MeasureStep.HEIGHT -> aimHeight != null
-            MeasureStep.DONE -> false
-        }
 
         val edges = mutableListOf<ScreenEdge>()
         val labels = mutableListOf<DimLabel>()
@@ -245,43 +258,29 @@ class ArMeasureRenderer(
         }
 
         when {
-            // A만: A → 조준점 가로 미리보기
             placed.size == 1 -> {
                 project(placed[0])?.let { points += it }
-                if (aimFloor != null) {
-                    val width = MeasureGeometry.horizontalDistance(placed[0], aimFloor)
-                    label(edge(placed[0], aimFloor, measured = true), width, null)
-                    size = BoxSize(width * 100f, null, null)
-                }
             }
-            // A·B: 조준점으로 세로까지 바닥 직사각형 미리보기
             placed.size == 2 -> {
                 placed.mapNotNullTo(points) { project(it) }
-                if (aimFloor != null) {
-                    val rect = MeasureGeometry.rectifyFloor(placed[0], placed[1], aimFloor)
-                    addBox(rect, null, ::edge, ::label, project, size = { size = it })
-                } else {
-                    val width = MeasureGeometry.horizontalDistance(placed[0], placed[1])
-                    label(edge(placed[0], placed[1], measured = true), width, null)
-                    size = BoxSize(width * 100f, null, null)
-                }
+                val width = MeasureGeometry.horizontalDistance(placed[0], placed[1])
+                label(edge(placed[0], placed[1], measured = true), width, null)
+                size = BoxSize(width * 100f, null, null)
             }
-            // 바닥 확정: 높이(확정 또는 조준점 미리보기)로 직육면체
             placed.size >= 3 -> {
                 val rect = MeasureGeometry.rectifyFloor(placed[0], placed[1], placed[2])
-                rect.corners.take(3).mapNotNullTo(points) { project(it) }
-                val height = heightM ?: aimHeight
-                val topPoint = addBox(rect, height, ::edge, ::label, project, size = { size = it })
-                if (heightM != null) topPoint?.let { points += it }
+                val top = heightAnchor?.pose?.toVec3()
+                val height = top?.let { it.y - rect.a.y }
+                addBox(rect, height, ::edge, ::label, project, size = { size = it })
+                placed.take(3).mapNotNullTo(points) { project(it) }
+                top?.let(project)?.let { points += it }
             }
         }
 
         return MeasureUiState(
             tracking = tracking,
-            floorFound = floorFound,
             step = step,
-            aimValid = aimValid,
-            aimPoint = aimFloor?.let(project),
+            tapMissed = tapMissed,
             points = points,
             edges = edges,
             labels = labels,
@@ -346,5 +345,9 @@ class ArMeasureRenderer(
     private companion object {
         /** 이보다 낮은 높이는 측정 실패로 본다 (m) */
         const val MIN_HEIGHT_M = 0.01f
+
+        const val UI_UPDATE_INTERVAL_MS = 33L
+
+        const val TOP_SURFACE_MARGIN_M = 0.05f
     }
 }
