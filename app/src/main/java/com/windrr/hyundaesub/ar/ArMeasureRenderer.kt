@@ -198,9 +198,9 @@ class ArMeasureRenderer(
         val invViewProj = FloatArray(16).also { Matrix.invertM(it, 0, viewProj, 0) }
 
         var changed = false
-        while (true) {
+        // 추적 전이면 터치를 버리지 않고 다음 프레임까지 기다린다 (끌기 이동만 버림)
+        while (trackingNow) {
             val event = events.poll() ?: break
-            if (!trackingNow && event !is TouchEvent.DragEnd) continue
             when (event) {
                 is TouchEvent.Tap -> handleTap(frame, event.at, invViewProj)
                 is TouchEvent.DragStart -> dragIndex = nearestHandle(event.at)
@@ -209,6 +209,7 @@ class ArMeasureRenderer(
             }
             changed = true
         }
+        if (!trackingNow) events.removeAll { it is TouchEvent.DragMove }
 
         if (!changed && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
         lastUiUpdateMs = now
@@ -223,15 +224,13 @@ class ArMeasureRenderer(
         else -> MeasureStep.DONE
     }
 
+    /** 탭 = 그 자리가 꼭짓점. 인식 상태와 상관없이 항상 점을 찍는다 */
     private fun handleTap(frame: Frame, tap: Offset, invViewProj: FloatArray) {
-        // 이미 찍은 점 근처를 탭하면 새 점을 찍지 않는다 (끌어서 옮기려다 탭으로 끝난 경우)
-        if (nearestHandle(tap) != null) return
         when (currentStep()) {
             MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> {
                 val point = floorPointAt(frame, tap, invViewProj)
-                tapMissed = point == null
+                tapMissed = false
                 badCircle = false
-                point ?: return
                 if (shape == MeasureShape.CYLINDER && anchors.size == 2) {
                     val (a, b) = anchors.map { it.pose.toVec3() }
                     if (!validCircle(a, b, point)) {
@@ -244,7 +243,7 @@ class ArMeasureRenderer(
             MeasureStep.HEIGHT -> {
                 val top = heightTopAt(frame, tap, invViewProj)
                 tapMissed = top == null
-                heightAnchor = top?.let(::anchorAt)
+                top?.let { heightAnchor = anchorAt(it) }
             }
             MeasureStep.DONE -> Unit
         }
@@ -253,7 +252,7 @@ class ArMeasureRenderer(
     /** 끌기: 바닥 점은 바닥 위에서, 높이 점은 높이만 바뀐다. 인식 못 한 위치면 그대로 둔다 */
     private fun moveHandle(frame: Frame, index: Int, at: Offset, invViewProj: FloatArray) {
         if (index < anchors.size) {
-            val point = floorPointAt(frame, at, invViewProj) ?: return
+            val point = floorPointAt(frame, at, invViewProj)
             if (shape == MeasureShape.CYLINDER && anchors.size == 3) {
                 val others = anchors.indices.filter { it != index }.map { anchors[it].pose.toVec3() }
                 if (!validCircle(others[0], others[1], point)) return
@@ -284,14 +283,26 @@ class ArMeasureRenderer(
     private fun anchorAt(p: Vec3): Anchor = session.createAnchor(Pose.makeTranslation(p.x, p.y, p.z))
 
     /**
-     * 터치한 곳의 바닥 지점 = 터치 시선과 바닥 평면의 교점.
-     * 바닥 높이: 이미 찍은 점이 있으면 그 높이, 없으면 터치 위치의 수평면 → 인식한 바닥 중 가장 낮은 면.
+     * 터치한 곳의 바닥 지점 = 터치 시선과 바닥 평면의 교점. **항상 점을 돌려준다.**
+     * 바닥 높이는 첫 점에서 한 번 정하고 이후 점에 같이 쓴다. 정하는 순서:
+     * 터치한 곳의 수평면 → 인식한 수평면 중 가장 낮은 면 → 터치한 곳의 깊이·특징점 → 폰 높이 기준 추정(1.2m 아래).
+     * 시선이 바닥과 만나지 않으면(위를 향함) 시선 위 1m 지점.
      */
-    private fun floorPointAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
-        val y = floorY ?: (horizontalPlaneYAt(frame, at) ?: trackedFloorY())?.also { floorY = it } ?: return null
+    private fun floorPointAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3 {
         val ray = MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj)
+        val y = floorY
+            ?: (horizontalPlaneYAt(frame, at) ?: trackedFloorY() ?: anySurfaceYAt(frame, at) ?: guessedFloorY(frame))
+                .also { floorY = it }
         return MeasureGeometry.intersectHorizontalPlane(ray, y)
+            ?: (ray.origin + ray.direction.normalized() * FALLBACK_DISTANCE_M)
     }
+
+    /** 터치한 곳의 아무 표면(깊이·특징점 포함) 높이 */
+    private fun anySurfaceYAt(frame: Frame, at: Offset): Float? =
+        frame.hitTest(at.x, at.y).firstOrNull()?.hitPose?.ty()
+
+    /** 아무것도 인식 못 했을 때: 폰이 바닥에서 1.2m쯤 위에 있다고 가정 */
+    private fun guessedFloorY(frame: Frame): Float = frame.camera.pose.ty() - GUESSED_CAMERA_HEIGHT_M
 
     /** 터치 위치에 닿은 위를 향한 수평면의 높이 (폴리곤 밖이어도 평면 높이는 쓸 수 있다) */
     private fun horizontalPlaneYAt(frame: Frame, at: Offset): Float? =
@@ -334,7 +345,13 @@ class ArMeasureRenderer(
                 plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
                 it.hitPose.ty() - baseY >= MIN_HEIGHT_M
         }?.hitPose?.toVec3()?.takeIf(insideTop)
-        val top = onTopPlane ?: MeasureGeometry.topOnNearestVertical(verticals, ray)
+        val top = onTopPlane
+            ?: MeasureGeometry.topOnNearestVertical(verticals, ray)
+            // 수직선과 만나지 않으면(거의 위에서 내려다봄) 시선이 바닥 중심 위를 지나는 높이로 근사
+            ?: verticals.reduce { acc, v -> acc + v }.let { sum ->
+                val c = sum * (1f / verticals.size)
+                MeasureGeometry.heightAlongVertical(Vec3(c.x, baseY, c.z), ray)?.let { h -> Vec3(c.x, baseY + h, c.z) }
+            }
         return top?.takeIf { it.y - baseY >= MIN_HEIGHT_M }
     }
 
@@ -531,5 +548,11 @@ class ArMeasureRenderer(
 
         /** 원통 반지름 상한 (m). 이보다 크면 잘못 찍은 것으로 본다 */
         const val MAX_RADIUS_M = 1.0f
+
+        /** 바닥을 하나도 인식 못 했을 때 가정하는 폰 높이 (m) */
+        const val GUESSED_CAMERA_HEIGHT_M = 1.2f
+
+        /** 시선이 바닥과 만나지 않을 때 점을 둘 거리 (m) */
+        const val FALLBACK_DISTANCE_M = 1.0f
     }
 }
