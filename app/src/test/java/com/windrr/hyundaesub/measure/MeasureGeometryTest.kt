@@ -114,4 +114,37 @@ class MeasureGeometryTest {
         assertEquals(4, top.size)
         top.forEach { assertEquals(0.25f, it.y, 1e-6f) }
     }
+
+    @Test
+    fun circleThrough_threeRimPoints_findsCenterAndRadius() {
+        // 중심 (1, 0, 2), 반지름 0.25m 원 위의 세 점
+        val c = Vec3(1f, 0f, 2f)
+        val r = 0.25f
+        fun rim(deg: Double) = Vec3(c.x + r * Math.cos(Math.toRadians(deg)).toFloat(), 0f, c.z + r * Math.sin(Math.toRadians(deg)).toFloat())
+        val circle = MeasureGeometry.circleThrough(rim(10.0), rim(130.0), rim(250.0))
+        assertNotNull(circle)
+        assertEquals(1f, circle!!.center.x, 1e-4f)
+        assertEquals(2f, circle.center.z, 1e-4f)
+        assertEquals(0.5f, circle.diameter, 1e-4f)
+    }
+
+    @Test
+    fun circleThrough_closeRimPoints_stillExact() {
+        // 둘레 한쪽(90도 안)에 몰려 찍어도 원은 같다
+        val r = 0.2f
+        fun rim(deg: Double) = Vec3(r * Math.cos(Math.toRadians(deg)).toFloat(), 0f, r * Math.sin(Math.toRadians(deg)).toFloat())
+        assertEquals(0.4f, MeasureGeometry.circleThrough(rim(0.0), rim(45.0), rim(90.0))!!.diameter, 1e-4f)
+    }
+
+    @Test
+    fun circleThrough_collinear_isNull() {
+        assertNull(MeasureGeometry.circleThrough(Vec3(0f, 0f, 0f), Vec3(0.2f, 0f, 0f), Vec3(0.4f, 0f, 0.001f)))
+    }
+
+    @Test
+    fun circleThrough_usesFloorOfA() {
+        val circle = MeasureGeometry.circleThrough(Vec3(0.2f, 0.03f, 0f), Vec3(0f, -0.01f, 0.2f), Vec3(-0.2f, 0f, 0f))!!
+        assertEquals(0.03f, circle.center.y, 1e-6f)
+        assertEquals(0.2f, circle.radius, 1e-4f)
+    }
 }

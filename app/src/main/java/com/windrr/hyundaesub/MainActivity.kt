@@ -12,6 +12,7 @@ import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.ui.item.ItemSelectScreen
 import com.windrr.hyundaesub.ui.item.confirm.ItemConfirmRoute
 import com.windrr.hyundaesub.ui.item.newitem.NewItemGuideScreen
+import com.windrr.hyundaesub.ui.item.shape.ShapeSelectScreen
 import com.windrr.hyundaesub.ui.item.saved.SavedItemsRoute
 import com.windrr.hyundaesub.ui.main.MainIntent
 import com.windrr.hyundaesub.ui.main.MainRoute
@@ -97,9 +98,16 @@ class MainActivity : ComponentActivity() {
                         reselect = true,
                         initialSeats = state.occupiedSeats,
                     )
+                    MainRoute.SHAPE_SELECT -> ShapeSelectScreen(
+                        selected = state.measureShape,
+                        onSelect = { viewModel.onIntent(MainIntent.SelectMeasureShape(it)) },
+                        onBack = { viewModel.onIntent(MainIntent.BackFromShapeSelect) },
+                        onNext = { viewModel.onIntent(MainIntent.ShapeSelected) },
+                    )
                     MainRoute.MEASURE -> ArMeasureScreen(
                         onBack = { viewModel.onIntent(MainIntent.CloseMeasure) },
                         onMeasured = { viewModel.onIntent(MainIntent.ItemMeasured(it)) },
+                        shape = state.measureShape,
                     )
                 }
             }

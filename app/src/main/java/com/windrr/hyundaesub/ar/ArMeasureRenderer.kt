@@ -16,8 +16,10 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.windrr.hyundaesub.measure.BoxSize
+import com.windrr.hyundaesub.measure.FloorCircle
 import com.windrr.hyundaesub.measure.FloorRect
 import com.windrr.hyundaesub.measure.MeasureGeometry
+import com.windrr.hyundaesub.measure.MeasureShape
 import com.windrr.hyundaesub.measure.Vec3
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
@@ -53,6 +55,8 @@ data class MeasureUiState(
     val tracking: Boolean = false,
     val step: MeasureStep = MeasureStep.POINT_A,
     val tapMissed: Boolean = false,
+    /** 원통: 세 점이 한 줄에 가까워 원을 만들 수 없음 */
+    val badCircle: Boolean = false,
     /** 확정된 점 (바닥 꼭짓점, 높이 끝) */
     val points: List<Offset> = emptyList(),
     /** 직육면체 모서리 (확정 + 실시간 미리보기) */
@@ -72,6 +76,8 @@ data class MeasureUiState(
 class ArMeasureRenderer(
     private val session: Session,
     private val displayRotation: () -> Int,
+    /** BOX = 바닥 꼭짓점 3개, CYLINDER = 바닥 둘레 3점 */
+    private val shape: MeasureShape = MeasureShape.BOX,
     private val onUpdate: (MeasureUiState) -> Unit,
 ) : GLSurfaceView.Renderer {
 
@@ -83,6 +89,7 @@ class ArMeasureRenderer(
     private var viewHeight = 1
     private var lastUiUpdateMs = 0L
     private var tapMissed = false
+    private var badCircle = false
 
     @Volatile
     private var resetRequested = false
@@ -126,6 +133,7 @@ class ArMeasureRenderer(
             heightAnchor = null
             taps.clear()
             tapMissed = false
+            badCircle = false
             resetRequested = false
         }
         if (undoRequested) {
@@ -137,6 +145,7 @@ class ArMeasureRenderer(
                 anchors.isNotEmpty() -> anchors.removeAt(anchors.lastIndex).detach()
             }
             tapMissed = false
+            badCircle = false
             undoRequested = false
         }
 
@@ -182,6 +191,16 @@ class ArMeasureRenderer(
             MeasureStep.POINT_A, MeasureStep.POINT_B, MeasureStep.POINT_C -> {
                 val point = surfacePointOnTapRay(frame, tap, invViewProj)
                 tapMissed = point == null
+                badCircle = false
+                if (point != null && shape == MeasureShape.CYLINDER && anchors.size == 2) {
+                    // 세 번째 둘레 점: 원이 안 만들어지거나 비현실적으로 크면 받지 않는다
+                    val (a, b) = anchors.map { it.pose.toVec3() }
+                    val circle = MeasureGeometry.circleThrough(a, b, point)
+                    if (circle == null || circle.radius > MAX_RADIUS_M) {
+                        badCircle = true
+                        return
+                    }
+                }
                 point?.let { anchors += session.createAnchor(Pose.makeTranslation(it.x, it.y, it.z)) }
             }
             MeasureStep.HEIGHT -> {
@@ -213,6 +232,7 @@ class ArMeasureRenderer(
      * 아니면 바닥 네 꼭짓점의 수직선 중 시선과 가장 가까운 수직선 위 지점을 쓴다.
      */
     private fun heightTopAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
+        if (shape == MeasureShape.CYLINDER) return cylinderTopAt(frame, at, invViewProj)
         val rect = floorRect() ?: return null
         val top = surfacePointOnTapRay(frame, at, invViewProj)
             ?.takeIf { rect.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
@@ -221,6 +241,27 @@ class ArMeasureRenderer(
                 MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj),
             )
         return top?.takeIf { it.y - rect.a.y >= MIN_HEIGHT_M }
+    }
+
+    /**
+     * 원통 높이 끝점. 터치한 곳이 원 위쪽 표면(윗면)이면 그 지점,
+     * 아니면 둘레 수직선들 중 시선과 가장 가까운 수직선 위 지점(옆면 윗 가장자리).
+     */
+    private fun cylinderTopAt(frame: Frame, at: Offset, invViewProj: FloatArray): Vec3? {
+        val circle = floorCircle() ?: return null
+        val top = surfacePointOnTapRay(frame, at, invViewProj)
+            ?.takeIf { circle.containsHorizontally(it, TOP_SURFACE_MARGIN_M) }
+            ?: MeasureGeometry.topOnNearestVertical(
+                circle.rim(RIM_SAMPLES),
+                MeasureGeometry.rayFromScreen(at.x, at.y, viewWidth, viewHeight, invViewProj),
+            )
+        return top?.takeIf { it.y - circle.center.y >= MIN_HEIGHT_M }
+    }
+
+    private fun floorCircle(): FloorCircle? {
+        if (anchors.size < 3) return null
+        val (a, b, c) = anchors.take(3).map { it.pose.toVec3() }
+        return MeasureGeometry.circleThrough(a, b, c)
     }
 
     private fun floorRect(): FloorRect? {
@@ -258,6 +299,21 @@ class ArMeasureRenderer(
         }
 
         when {
+            shape == MeasureShape.CYLINDER && placed.size >= 3 -> {
+                val circle = MeasureGeometry.circleThrough(placed[0], placed[1], placed[2])
+                if (circle != null) {
+                    val top = heightAnchor?.pose?.toVec3()
+                    val height = top?.let { it.y - circle.center.y }
+                    addCylinder(circle, placed[0], height, ::edge, ::label, project, size = { size = it })
+                }
+                placed.take(3).mapNotNullTo(points) { project(it) }
+                heightAnchor?.pose?.toVec3()?.let(project)?.let { points += it }
+            }
+            shape == MeasureShape.CYLINDER && placed.size == 2 -> {
+                // 둘레 두 점: 지름이 아니라 현(chord)이라 치수는 아직 표시하지 않는다
+                placed.mapNotNullTo(points) { project(it) }
+                edge(placed[0], placed[1], measured = false)
+            }
             placed.size == 1 -> {
                 project(placed[0])?.let { points += it }
             }
@@ -281,6 +337,7 @@ class ArMeasureRenderer(
             tracking = tracking,
             step = step,
             tapMissed = tapMissed,
+            badCircle = badCircle,
             points = points,
             edges = edges,
             labels = labels,
@@ -328,6 +385,47 @@ class ArMeasureRenderer(
         return topPoint
     }
 
+    /**
+     * 원통: 바닥 원·윗면 원(둘레를 선분으로 근사) + 화면 좌우 끝 옆선 + 지름선.
+     * 지름 라벨은 첫 번째 둘레 점 A를 지나는 지름, 높이 라벨은 화면에서 가장 오른쪽 옆선.
+     * 실을 때는 지름 × 지름 × 높이 상자로 본다.
+     */
+    private fun addCylinder(
+        circle: FloorCircle,
+        firstRimPoint: Vec3,
+        height: Float?,
+        edge: (Vec3, Vec3, Boolean) -> Pair<Offset, Offset>?,
+        label: (Pair<Offset, Offset>?, Float, Offset?) -> Unit,
+        project: (Vec3) -> Offset?,
+        size: (BoxSize) -> Unit,
+    ) {
+        val start = kotlin.math.atan2(firstRimPoint.z - circle.center.z, firstRimPoint.x - circle.center.x)
+        val base = circle.rim(RIM_SEGMENTS, start)
+        val top = height?.let { circle.rim(RIM_SEGMENTS, start, it) }
+        val center = (base + top.orEmpty()).mapNotNull(project).takeIf { it.isNotEmpty() }?.let { pts ->
+            pts.reduce { acc, o -> acc + o } / pts.size.toFloat()
+        }
+
+        for (i in base.indices) edge(base[i], base[(i + 1) % base.size], false)
+        if (top != null) {
+            for (i in top.indices) edge(top[i], top[(i + 1) % top.size], false)
+        }
+
+        // 지름: A에서 중심을 지나 반대편까지
+        val opposite = base[RIM_SEGMENTS / 2]
+        label(edge(base[0], opposite, true), circle.diameter, center)
+
+        if (top != null && height != null) {
+            // 원통 윤곽처럼 보이도록 화면 좌우 끝에 옆선
+            val projected = base.indices.mapNotNull { i -> project(base[i])?.let { i to it.x } }
+            val left = projected.minByOrNull { it.second }?.first
+            val right = projected.maxByOrNull { it.second }?.first
+            left?.let { edge(base[it], top[it], false) }
+            right?.let { label(edge(base[it], top[it], true), height, center) }
+        }
+        size(BoxSize(circle.diameter * 100f, circle.diameter * 100f, height?.times(100f)))
+    }
+
     /** 라벨을 선에서 띄울 방향: 선에 수직이면서 상자 중심에서 멀어지는 쪽 */
     private fun outwardOf(line: Pair<Offset, Offset>, mid: Offset, boxCenter: Offset?): Offset {
         val dir = line.second - line.first
@@ -349,5 +447,14 @@ class ArMeasureRenderer(
         const val UI_UPDATE_INTERVAL_MS = 33L
 
         const val TOP_SURFACE_MARGIN_M = 0.05f
+
+        /** 원통 둘레를 그릴 때 선분 수 (짝수 — 지름 반대편 점이 정확히 잡히도록) */
+        const val RIM_SEGMENTS = 36
+
+        /** 원통 높이 수직선 후보 수 */
+        const val RIM_SAMPLES = 24
+
+        /** 원통 반지름 상한 (m). 이보다 크면 잘못 찍은 것으로 본다 */
+        const val MAX_RADIUS_M = 1.0f
     }
 }

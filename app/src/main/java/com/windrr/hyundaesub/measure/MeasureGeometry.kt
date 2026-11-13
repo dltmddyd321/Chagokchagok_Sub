@@ -1,6 +1,8 @@
 package com.windrr.hyundaesub.measure
 
 import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** ARCore 월드 좌표 (단위 m, y축이 위쪽) */
@@ -50,6 +52,30 @@ data class FloorRect(val a: Vec3, val b: Vec3, val c: Vec3, val d: Vec3) {
     fun top(height: Float): List<Vec3> = corners.map { it + Vec3.UP * height }
 }
 
+/** 측정할 물건의 바닥 모양 */
+enum class MeasureShape {
+    /** 상자·캐리어처럼 각진 물건: 바닥 꼭짓점 3개 → 직사각형 */
+    BOX,
+
+    /** 원통·둥근 받침: 바닥 둘레 3점 → 원 (지름 × 지름 바운딩 박스로 싣는다) */
+    CYLINDER,
+}
+
+/** 바닥 원. center는 바닥 높이(y)에 있다 */
+data class FloorCircle(val center: Vec3, val radius: Float) {
+    val diameter: Float get() = radius * 2f
+
+    /** 둘레를 n등분한 점 (시작 각도 startAngle, 라디안) */
+    fun rim(n: Int, startAngle: Float = 0f, height: Float = 0f): List<Vec3> = List(n) { i ->
+        val t = startAngle + (2.0 * Math.PI * i / n).toFloat()
+        Vec3(center.x + radius * cos(t), center.y + height, center.z + radius * sin(t))
+    }
+
+    /** p가 위에서 봤을 때 원 안(+여유)인지 */
+    fun containsHorizontally(p: Vec3, margin: Float): Boolean =
+        MeasureGeometry.horizontalDistance(center, p) <= radius + margin
+}
+
 object MeasureGeometry {
 
     /** 바닥 위 두 점의 수평 거리 (높이 차는 무시) */
@@ -57,6 +83,31 @@ object MeasureGeometry {
         val d = b - a
         return sqrt(d.x * d.x + d.z * d.z)
     }
+
+    /**
+     * 바닥 둘레 위 세 점을 지나는 원 (위에서 본 x·z 평면의 외접원, 높이는 A 기준).
+     * 세 점이 거의 한 줄이면 원을 정할 수 없어 null.
+     * 지름 두 점을 정확히 맞히기 어려워서, 둘레 아무 데나 세 점을 찍게 하고 원을 역산한다.
+     */
+    fun circleThrough(a: Vec3, b: Vec3, c: Vec3): FloorCircle? {
+        // A 기준 상대좌표로 계산해 큰 월드 좌표에서의 정밀도 손실을 줄인다
+        val bx = b.x - a.x
+        val bz = b.z - a.z
+        val cx = c.x - a.x
+        val cz = c.z - a.z
+        val d = 2f * (bx * cz - bz * cx)
+        val scale = maxOf(bx * bx + bz * bz, cx * cx + cz * cz)
+        if (scale < MIN_EDGE_M * MIN_EDGE_M || kotlin.math.abs(d) < COLLINEAR_EPS * scale) return null
+        val b2 = bx * bx + bz * bz
+        val c2 = cx * cx + cz * cz
+        val ux = (cz * b2 - bz * c2) / d
+        val uz = (bx * c2 - cx * b2) / d
+        val center = Vec3(a.x + ux, a.y, a.z + uz)
+        return FloorCircle(center, sqrt(ux * ux + uz * uz))
+    }
+
+    /** 세 점이 한 줄로 판단되는 기준 (넓이 비율) */
+    private const val COLLINEAR_EPS = 0.05f
 
     /**
      * 사용자가 찍은 바닥 세 점 A·B·C를 직사각형으로 바로잡는다.

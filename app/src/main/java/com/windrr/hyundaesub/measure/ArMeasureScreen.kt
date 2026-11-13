@@ -82,7 +82,11 @@ import com.windrr.hyundaesub.ar.MeasureUiState
  * 측정이 끝난 뒤 셔터를 누르면 [onMeasured]로 가로·세로·높이(cm)를 넘긴다.
  */
 @Composable
-fun ArMeasureScreen(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) {
+fun ArMeasureScreen(
+    onBack: () -> Unit,
+    onMeasured: (BoxSize) -> Unit,
+    shape: MeasureShape = MeasureShape.BOX,
+) {
     val context = LocalContext.current
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -98,14 +102,14 @@ fun ArMeasureScreen(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) {
     BackHandler(onBack = onBack)
 
     if (hasCameraPermission) {
-        ArMeasureContent(onBack, onMeasured)
+        ArMeasureContent(onBack, onMeasured, shape)
     } else {
         MessageScreen("물건을 재려면 카메라 권한이 필요해요.", onBack)
     }
 }
 
 @Composable
-private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) {
+private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, shape: MeasureShape) {
     val context = LocalContext.current
     val activity = context as Activity
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -145,7 +149,7 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
                             }
                         },
                     )
-                    val r = ArMeasureRenderer(s, { glView.display?.rotation ?: 0 }) { state ->
+                    val r = ArMeasureRenderer(s, { glView.display?.rotation ?: 0 }, shape) { state ->
                         glView.post { uiState = state }
                     }
                     glView.setRenderer(r)
@@ -262,6 +266,7 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
             }
             GuidePill(
                 state = uiState,
+                shape = shape,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp, start = 24.dp, end = 24.dp),
@@ -294,9 +299,11 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit) 
     }
 }
 
-private fun guideMessage(state: MeasureUiState): String = when {
+private fun guideMessage(state: MeasureUiState, shape: MeasureShape): String = when {
     !state.tracking -> "폰을 천천히 움직여 주세요"
     state.tapMissed -> "그 위치를 인식하지 못했어요. 폰을 조금 움직인 뒤 다시 터치해 주세요"
+    state.badCircle -> "세 점이 한 줄에 가까워요. 둘레를 따라 서로 떨어진 곳을 터치해 주세요"
+    shape == MeasureShape.CYLINDER -> cylinderGuide(state.step)
     state.step == MeasureStep.POINT_A -> "물건 바닥의 왼쪽 앞 꼭짓점을 터치하세요"
     state.step == MeasureStep.POINT_B -> "물건 바닥의 오른쪽 앞 꼭짓점을 터치하세요"
     state.step == MeasureStep.POINT_C -> "물건 바닥의 오른쪽 뒤 꼭짓점을 터치하세요"
@@ -304,10 +311,19 @@ private fun guideMessage(state: MeasureUiState): String = when {
     else -> "측정이 끝났어요. 확인을 눌러 주세요"
 }
 
+/** 원통: 바닥 둘레 아무 곳 세 점 → 원, 윗면 가장자리 한 점 → 높이 */
+private fun cylinderGuide(step: MeasureStep): String = when (step) {
+    MeasureStep.POINT_A -> "물건 바닥 둘레의 한 곳을 터치하세요"
+    MeasureStep.POINT_B -> "바닥 둘레를 따라 떨어진 다른 곳을 터치하세요"
+    MeasureStep.POINT_C -> "바닥 둘레의 세 번째 곳을 터치하세요 (고르게 떨어질수록 정확해요)"
+    MeasureStep.HEIGHT -> "물건 윗면 가장자리를 터치하세요"
+    MeasureStep.DONE -> "측정이 끝났어요. 확인을 눌러 주세요"
+}
+
 @Composable
-private fun GuidePill(state: MeasureUiState, modifier: Modifier = Modifier) {
+private fun GuidePill(state: MeasureUiState, shape: MeasureShape, modifier: Modifier = Modifier) {
     Text(
-        text = guideMessage(state),
+        text = guideMessage(state, shape),
         color = Color.White,
         fontSize = 13.sp,
         textAlign = TextAlign.Center,

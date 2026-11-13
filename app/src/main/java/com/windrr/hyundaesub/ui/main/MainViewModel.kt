@@ -38,9 +38,12 @@ class MainViewModel : ViewModel() {
             MainIntent.AddNewItem -> _state.update {
                 it.copy(route = MainRoute.NEW_ITEM_GUIDE, lastItemSource = ItemSource.NEW)
             }
-            MainIntent.StartArMeasure -> _state.update {
-                it.copy(route = MainRoute.MEASURE, measureReturnRoute = MainRoute.NEW_ITEM_GUIDE)
+            MainIntent.StartArMeasure -> _state.update { it.copy(route = MainRoute.SHAPE_SELECT) }
+            is MainIntent.SelectMeasureShape -> _state.update { it.copy(measureShape = intent.shape) }
+            MainIntent.ShapeSelected -> _state.update {
+                it.copy(route = MainRoute.MEASURE, measureReturnRoute = MainRoute.SHAPE_SELECT)
             }
+            MainIntent.BackFromShapeSelect -> _state.update { it.copy(route = MainRoute.NEW_ITEM_GUIDE) }
             MainIntent.OpenManualInput -> _state.update {
                 it.copy(route = MainRoute.ITEM_CONFIRM, measuredSize = null, confirmId = it.confirmId + 1)
             }

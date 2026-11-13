@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.data.local.entity.SeatCode
 import com.windrr.hyundaesub.measure.BoxSize
+import com.windrr.hyundaesub.measure.MeasureShape
 import com.windrr.hyundaesub.ui.item.ItemSource
 import com.windrr.hyundaesub.ui.item.PickedItem
 import com.windrr.hyundaesub.ui.result.ConditionChange
@@ -33,6 +34,9 @@ enum class MainRoute {
 
     /** 짐 선택 > 새 물건 추가: 측정 방법 안내 */
     NEW_ITEM_GUIDE,
+
+    /** AR 측정 전: 물건 바닥 모양 선택 (네모 / 둥근) */
+    SHAPE_SELECT,
 
     /** AR 촬영 후 측정값 확인 / 직접 입력 */
     ITEM_CONFIRM,
@@ -70,6 +74,8 @@ data class MainUiState(
     val measureReturnRoute: MainRoute = MainRoute.TABS,
     /** 확인 화면에 채울 AR 측정값 (null = 직접 입력) */
     val measuredSize: BoxSize? = null,
+    /** AR 측정 방식 (바닥 모양) */
+    val measureShape: MeasureShape = MeasureShape.BOX,
     /** 확인 화면에 들어올 때마다 증가 — 확인 화면 ViewModel을 새로 만드는 키 */
     val confirmId: Int = 0,
     /** 배치 실패 후 바꾸기로 고른 조건 */
@@ -99,8 +105,16 @@ sealed interface MainIntent {
     /** 짐 선택 > 새 물건 추가 → 측정 안내 */
     data object AddNewItem : MainIntent
 
-    /** 측정 안내 > AR 측정하기 → 전체 화면 AR 카메라 */
+    /** 측정 안내 > AR 측정하기 → 바닥 모양 선택 */
     data object StartArMeasure : MainIntent
+
+    data class SelectMeasureShape(val shape: MeasureShape) : MainIntent
+
+    /** 바닥 모양 선택 > 다음 → 전체 화면 AR 카메라 */
+    data object ShapeSelected : MainIntent
+
+    /** 바닥 모양 선택 > 이전 → 측정 안내 */
+    data object BackFromShapeSelect : MainIntent
 
     /** 측정 안내 > 직접 입력하기 → 빈 확인 화면 */
     data object OpenManualInput : MainIntent
