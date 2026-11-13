@@ -1,5 +1,11 @@
 package com.windrr.hyundaesub.ui.seat
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import com.windrr.hyundaesub.ui.component.StepIndicator
+import com.windrr.hyundaesub.ui.component.LOAD_FLOW_STEPS
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.offset
@@ -101,44 +107,80 @@ fun SeatSelectScreen(
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            if (reselect) BackOnlyTopBar(onBack) else FlowTopBar(step = 0, onBack = onBack)
-            Spacer(Modifier.height(40.dp))
-            Text(
-                text = if (reselect) "탑승할 좌석을\n다시 선택해 주세요" else "탑승할 좌석을\n선택해 주세요",
-                color = ChagokTextPrimary,
-                fontSize = 28.sp,
-                lineHeight = 38.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "카시트를 설치한 좌석도 선택해 주세요.",
-                color = ChagokTextSecondary,
-                fontSize = 15.sp,
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-
-        CarTopView(
-            selectedSeats = state.selectedSeats,
-            onSeatClick = { onIntent(SeatSelectIntent.ToggleSeat(it)) },
-        )
-
+        // 내용은 스크롤, 하단 버튼은 항상 고정 크기로 (화면이 작으면 버튼이 찌그러지던 문제)
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 20.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.height(20.dp))
-            SelectedSeatSummary(count = state.selectedCount)
-            Spacer(Modifier.weight(1f))
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                if (reselect) {
+                    BackOnlyTopBar(onBack)
+                } else {
+                    // 시안: 상단은 단계 점만
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        StepIndicator(current = 0, total = LOAD_FLOW_STEPS)
+                    }
+                }
+                Spacer(Modifier.height(32.dp))
+                Text(
+                    text = if (reselect) "탑승할 좌석을\n다시 선택해 주세요" else "탑승할 좌석을\n선택해 주세요",
+                    color = ChagokTextPrimary,
+                    fontSize = 26.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "카시트를 설치한 좌석도 선택해 주세요.",
+                    color = ChagokTextSecondary,
+                    fontSize = 15.sp,
+                )
+            }
+            Spacer(Modifier.height(28.dp))
+
+            CarTopView(
+                selectedSeats = state.selectedSeats,
+                onSeatClick = { onIntent(SeatSelectIntent.ToggleSeat(it)) },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            SelectedSeatSummary(
+                count = state.selectedCount,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // 하단 버튼: 처음 선택 = 이전 / 다음, 다시 선택 = 선택 완료
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (!reselect) {
+                Button(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrevButtonBg, contentColor = ChagokTextPrimary),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                ) {
+                    Text(text = "이전", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
             ChagokPrimaryButton(
                 text = if (reselect) "선택 완료" else "다음",
                 onClick = { onIntent(SeatSelectIntent.Next) },
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(16.dp))
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -204,9 +246,9 @@ private fun CarTopView(
 
 /** 탑뷰 이미지에서 보여줄 영역 (원본 px): 대시보드 아래 ~ 트렁크 앞 */
 private const val CROP_LEFT = 150
-private const val CROP_TOP = 420
+private const val CROP_TOP = 430
 private const val CROP_W = 955
-private const val CROP_H = 870
+private const val CROP_H = 822 // 360dp 폭에서 약 310dp (시안 비율)
 
 /** 좌석 버튼 크기 (원본 px) */
 private const val SLOT_PX = 150f
@@ -219,6 +261,7 @@ private val SEAT_CENTERS_PX = listOf(
     SeatCode.ROW_2_RIGHT to (817f to 1070f),
 )
 
+private val PrevButtonBg = Color(0xFFDDE3EE)
 private val TopViewBgEdge = Color(0xFF0B1A3C)
 private val TopViewBgCenter = Color(0xFF14284F)
 
@@ -269,21 +312,24 @@ private fun SeatSlot(
 }
 
 @Composable
-private fun SelectedSeatSummary(count: Int) {
+private fun SelectedSeatSummary(count: Int, modifier: Modifier = Modifier) {
+    // 시안: 선택 전에는 설명 한 줄, 선택하면 "선택한 좌석 N개" 제목이 붙는다
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Color.White)
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 18.dp, vertical = if (count > 0) 18.dp else 26.dp),
     ) {
-        Text(
-            text = "선택한 좌석 ${count}개",
-            color = ChagokTextPrimary,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(6.dp))
+        if (count > 0) {
+            Text(
+                text = "선택한 좌석 ${count}개",
+                color = ChagokTextPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         Text(
             text = "선택 좌석을 제외 후 보관 계획을 세워드릴게요.",
             color = ChagokTextSecondary,
