@@ -343,7 +343,17 @@ private fun ArMeasureContent(
 
         if (scanning) {
             ScanningGuide(issue = uiState.trackingIssue, modifier = Modifier.align(Alignment.Center))
-        } else {
+        }
+        // 상단 안내: 대표 사진을 찍기 전에는 사진 안내(인식 중에도 표시), 찍은 뒤에는 잴 치수 안내
+        if (lastPhotoUri == null) {
+            TopHint(
+                text = "대표 사진을 먼저 촬영해 주세요.",
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp),
+            )
+        } else if (!scanning) {
             DimensionHint(
                 measuredCount = uiState.segments.size,
                 shape = shape,
@@ -432,14 +442,21 @@ private fun DimensionHint(measuredCount: Int, shape: MeasureShape, modifier: Mod
         measuredCount < 3 -> "${names[measuredCount]}를 재 주세요 (${measuredCount + 1}/3)"
         else -> "측정이 끝났어요"
     }
+    TopHint(text = text, modifier = modifier)
+}
+
+/** 상단 반투명 안내 칩 */
+@Composable
+private fun TopHint(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         color = Color.White,
-        fontSize = 12.sp,
+        fontSize = 13.sp,
         textAlign = TextAlign.Center,
         modifier = modifier
+            .padding(horizontal = 56.dp)
             .clip(RoundedCornerShape(percent = 50))
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(Color.Black.copy(alpha = 0.5f))
             .padding(horizontal = 14.dp, vertical = 7.dp),
     )
 }
