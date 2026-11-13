@@ -147,4 +147,30 @@ class MeasureGeometryTest {
         assertEquals(0.03f, circle.center.y, 1e-6f)
         assertEquals(0.2f, circle.radius, 1e-4f)
     }
+
+    @Test
+    fun intersectHorizontalPlane_downwardRay_hitsFloor() {
+        val hit = MeasureGeometry.intersectHorizontalPlane(Ray(Vec3(0f, 1f, 0f), Vec3(0f, -1f, -1f)), 0f)
+        assertNotNull(hit)
+        assertEquals(0f, hit!!.y, 1e-5f)
+        assertEquals(-1f, hit.z, 1e-5f)
+    }
+
+    @Test
+    fun intersectHorizontalPlane_upwardRay_isNull() {
+        assertNull(MeasureGeometry.intersectHorizontalPlane(Ray(Vec3(0f, 1f, 0f), Vec3(0f, 0.2f, -1f)), 0f))
+    }
+
+    @Test
+    fun rectifyFloorAnyOrder_sameBoxForAnyTapOrder() {
+        // 40 x 30 상자의 세 꼭짓점 (0,0) (0.4,0) (0.4,-0.3) — 순서를 바꿔도 같은 크기
+        val p = listOf(Vec3(0f, 0f, 0f), Vec3(0.4f, 0f, 0f), Vec3(0.4f, 0f, -0.3f))
+        val orders = listOf(listOf(0, 1, 2), listOf(0, 2, 1), listOf(2, 0, 1), listOf(1, 2, 0))
+        orders.forEach { o ->
+            val rect = MeasureGeometry.rectifyFloorAnyOrder(p[o[0]], p[o[1]], p[o[2]])
+            val sides = listOf(rect.width, rect.depth).sorted()
+            assertEquals(0.3f, sides[0], 1e-4f)
+            assertEquals(0.4f, sides[1], 1e-4f)
+        }
+    }
 }

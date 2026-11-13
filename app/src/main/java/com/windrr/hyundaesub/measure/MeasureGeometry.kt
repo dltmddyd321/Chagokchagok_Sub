@@ -85,6 +85,38 @@ object MeasureGeometry {
     }
 
     /**
+     * 시선과 수평면(y = planeY)의 교점. 시선이 아래를 향하지 않거나 카메라 뒤쪽이면 null.
+     * 물건 바닥 꼭짓점은 항상 바닥 위에 있으므로, 표면 인식 대신 바닥 평면과 교차시키면
+     * 물건 옆면·특징점에 잘못 찍히는 일 없이 터치한 곳 바로 그 바닥 지점이 잡힌다.
+     */
+    fun intersectHorizontalPlane(ray: Ray, planeY: Float): Vec3? {
+        val d = ray.direction.normalized()
+        if (d.y > -1e-4f) return null
+        val t = (planeY - ray.origin.y) / d.y
+        if (t <= 0f) return null
+        return ray.origin + d * t
+    }
+
+    /**
+     * 바닥 꼭짓점 세 개를 찍은 순서와 상관없이 직사각형으로.
+     * 세 점 중 두 변이 이루는 각이 직각에 가장 가까운 점을 모서리(B)로 보고 A·B·C를 다시 정한다.
+     * (대각선 두 점 + 한 점처럼 어떤 순서로 찍어도 같은 상자가 나온다)
+     */
+    fun rectifyFloorAnyOrder(p0: Vec3, p1: Vec3, p2: Vec3): FloorRect {
+        val pts = listOf(p0, p1, p2)
+        fun flat(v: Vec3) = Vec3(v.x, 0f, v.z)
+        val corner = pts.indices.minByOrNull { i ->
+            val o = flat(pts[i])
+            val u = (flat(pts[(i + 1) % 3]) - o).normalized()
+            val v = (flat(pts[(i + 2) % 3]) - o).normalized()
+            kotlin.math.abs(u dot v)
+        } ?: 1
+        val a = pts[(corner + 1) % 3]
+        val c = pts[(corner + 2) % 3]
+        return rectifyFloor(a, pts[corner], c)
+    }
+
+    /**
      * 바닥 둘레 위 세 점을 지나는 원 (위에서 본 x·z 평면의 외접원, 높이는 A 기준).
      * 세 점이 거의 한 줄이면 원을 정할 수 없어 null.
      * 지름 두 점을 정확히 맞히기 어려워서, 둘레 아무 데나 세 점을 찍게 하고 원을 역산한다.

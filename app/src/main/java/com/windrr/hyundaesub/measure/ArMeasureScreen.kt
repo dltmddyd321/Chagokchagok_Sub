@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,8 +49,10 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -122,6 +125,8 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
         }
     }
     var renderer by remember { mutableStateOf<ArMeasureRenderer?>(null) }
+    // 찍은 점을 손가락으로 잡았다고 볼 거리
+    val grabRadiusPx = with(LocalDensity.current) { 36.dp.toPx() }
     var uiState by remember { mutableStateOf(MeasureUiState()) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -149,7 +154,12 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                             }
                         },
                     )
-                    val r = ArMeasureRenderer(s, { glView.display?.rotation ?: 0 }, shape) { state ->
+                    val r = ArMeasureRenderer(
+                        session = s,
+                        displayRotation = { glView.display?.rotation ?: 0 },
+                        shape = shape,
+                        grabRadiusPx = grabRadiusPx,
+                    ) { state ->
                         glView.post { uiState = state }
                     }
                     glView.setRenderer(r)
@@ -259,6 +269,18 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
                     .fillMaxSize()
                     .pointerInput(renderer) {
                         detectTapGestures { offset -> renderer?.onTap(offset.x, offset.y) }
+                    }
+                    // 찍은 점 근처에서 끌면 그 점을 옮긴다 (빈 곳에서 끌면 무시)
+                    .pointerInput(renderer) {
+                        detectDragGestures(
+                            onDragStart = { offset -> renderer?.onDragStart(offset.x, offset.y) },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                renderer?.onDrag(change.position.x, change.position.y)
+                            },
+                            onDragEnd = { renderer?.onDragEnd() },
+                            onDragCancel = { renderer?.onDragEnd() },
+                        )
                     },
             ) {
                 drawCornerBrackets()
@@ -299,25 +321,35 @@ private fun ArMeasureContent(onBack: () -> Unit, onMeasured: (BoxSize) -> Unit, 
     }
 }
 
+/**
+ * 안내 문구. 우선순위: 추적 끊김(0.8초 이상) → 바닥 미인식 → 직전 터치 실패 → 단계 안내.
+ * 단계 안내는 순서를 강요하지 않는다 (꼭짓점은 아무 순서로, 찍은 점은 끌어서 옮길 수 있다).
+ */
 private fun guideMessage(state: MeasureUiState, shape: MeasureShape): String = when {
     !state.tracking -> "폰을 천천히 움직여 주세요"
-    state.tapMissed -> "그 위치를 인식하지 못했어요. 폰을 조금 움직인 뒤 다시 터치해 주세요"
+    !state.floorFound && state.step == MeasureStep.POINT_A -> "물건 주변 바닥을 비추며 폰을 천천히 움직여 주세요"
+    state.tapMissed -> "그 위치를 인식하지 못했어요. 바닥이나 물건 가장자리를 다시 터치해 주세요"
     state.badCircle -> "세 점이 한 줄에 가까워요. 둘레를 따라 서로 떨어진 곳을 터치해 주세요"
     shape == MeasureShape.CYLINDER -> cylinderGuide(state.step)
-    state.step == MeasureStep.POINT_A -> "물건 바닥의 왼쪽 앞 꼭짓점을 터치하세요"
-    state.step == MeasureStep.POINT_B -> "물건 바닥의 오른쪽 앞 꼭짓점을 터치하세요"
-    state.step == MeasureStep.POINT_C -> "물건 바닥의 오른쪽 뒤 꼭짓점을 터치하세요"
-    state.step == MeasureStep.HEIGHT -> "물건 윗면의 꼭짓점 하나를 터치하세요"
-    else -> "측정이 끝났어요. 확인을 눌러 주세요"
+    else -> boxGuide(state.step)
 }
 
-/** 원통: 바닥 둘레 아무 곳 세 점 → 원, 윗면 가장자리 한 점 → 높이 */
+/** 네모: 바닥 꼭짓점 아무 순서로 세 개 → 윗면 꼭짓점 하나 */
+private fun boxGuide(step: MeasureStep): String = when (step) {
+    MeasureStep.POINT_A -> "물건 바닥 꼭짓점 하나를 터치하세요"
+    MeasureStep.POINT_B -> "바닥 꼭짓점을 하나 더 터치하세요"
+    MeasureStep.POINT_C -> "바닥 꼭짓점을 하나 더 터치하세요 (순서는 상관없어요)"
+    MeasureStep.HEIGHT -> "물건 윗면 꼭짓점을 터치하세요 · 찍은 점은 끌어서 옮길 수 있어요"
+    MeasureStep.DONE -> "점을 끌어 맞춘 뒤 확인을 눌러 주세요"
+}
+
+/** 원통: 바닥 둘레 아무 곳 세 점 → 윗면 가장자리 한 점 */
 private fun cylinderGuide(step: MeasureStep): String = when (step) {
     MeasureStep.POINT_A -> "물건 바닥 둘레의 한 곳을 터치하세요"
     MeasureStep.POINT_B -> "바닥 둘레를 따라 떨어진 다른 곳을 터치하세요"
     MeasureStep.POINT_C -> "바닥 둘레의 세 번째 곳을 터치하세요 (고르게 떨어질수록 정확해요)"
-    MeasureStep.HEIGHT -> "물건 윗면 가장자리를 터치하세요"
-    MeasureStep.DONE -> "측정이 끝났어요. 확인을 눌러 주세요"
+    MeasureStep.HEIGHT -> "물건 윗면 가장자리를 터치하세요 · 찍은 점은 끌어서 옮길 수 있어요"
+    MeasureStep.DONE -> "점을 끌어 맞춘 뒤 확인을 눌러 주세요"
 }
 
 @Composable
@@ -390,9 +422,16 @@ private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: Te
         }
     }
 
-    state.points.forEach { p ->
-        drawCircle(Color.Black.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = p)
-        drawCircle(Color.White, radius = 7.dp.toPx(), center = p)
+    state.points.forEachIndexed { i, p ->
+        if (i == state.draggingIndex) {
+            // 끌고 있는 점: 크게 + 파란 테두리
+            drawCircle(DragRing.copy(alpha = 0.35f), radius = 22.dp.toPx(), center = p)
+            drawCircle(Color.White, radius = 9.dp.toPx(), center = p)
+            drawCircle(DragRing, radius = 9.dp.toPx(), center = p, style = Stroke(2.5.dp.toPx()))
+        } else {
+            drawCircle(Color.Black.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = p)
+            drawCircle(Color.White, radius = 7.dp.toPx(), center = p)
+        }
     }
 
     val style = TextStyle(
@@ -413,6 +452,7 @@ private fun DrawScope.drawMeasureOverlay(state: MeasureUiState, textMeasurer: Te
 }
 
 private val DoneText = Color(0xFF05082B)
+private val DragRing = Color(0xFF3D7BFF)
 
 private const val VERTEX_COUNT = 4
 
