@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                         pickedItems = state.pickedItems,
                         lastSource = state.lastItemSource,
                         onBack = { viewModel.onIntent(MainIntent.BackToSeatSelect) },
+                        onClose = { viewModel.onIntent(MainIntent.BackToTabs) },
                         onAddNew = { viewModel.onIntent(MainIntent.AddNewItem) },
                         onLoadSaved = { viewModel.onIntent(MainIntent.OpenSavedItems) },
                         onToggleItem = { viewModel.onIntent(MainIntent.TogglePickedItem(it)) },

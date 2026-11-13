@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -47,6 +48,8 @@ fun ItemCard(
     onIncrease: (() -> Unit)?,
     modifier: Modifier = Modifier,
     maxQuantity: Int = Int.MAX_VALUE,
+    /** 체크 모양: false = 사각 체크박스, true = 원형 체크 (짐 선택 화면 시안) */
+    circleCheck: Boolean = false,
 ) {
     val shape = RoundedCornerShape(20.dp)
     Column(
@@ -77,7 +80,7 @@ fun ItemCard(
                 Spacer(Modifier.height(6.dp))
                 Text(text = sizeLabel, color = ChagokTextSecondary, fontSize = 13.sp)
             }
-            CheckBox(checked = checked)
+            CheckBox(checked = checked, circle = circleCheck)
         }
         if (onDecrease != null && onIncrease != null) {
             Spacer(Modifier.height(16.dp))
@@ -121,10 +124,10 @@ private fun ItemThumbnail() {
 }
 
 @Composable
-private fun CheckBox(checked: Boolean) {
+private fun CheckBox(checked: Boolean, circle: Boolean) {
     if (checked) {
         Icon(
-            painter = painterResource(R.drawable.ic_checkbox_checked),
+            painter = painterResource(if (circle) R.drawable.ic_check_circle else R.drawable.ic_checkbox_checked),
             contentDescription = "선택됨",
             tint = Color.Unspecified,
             modifier = Modifier.size(22.dp),
@@ -135,7 +138,7 @@ private fun CheckBox(checked: Boolean) {
             modifier = Modifier
                 .padding(2.dp)
                 .size(18.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(if (circle) CircleShape else RoundedCornerShape(3.dp))
                 .background(UncheckedFill),
         )
     }
