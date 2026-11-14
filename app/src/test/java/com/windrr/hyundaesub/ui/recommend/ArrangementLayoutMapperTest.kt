@@ -57,6 +57,12 @@ class ArrangementLayoutMapperTest {
     }
 
     @Test
+    fun foldedGroups_andSpaceKind() {
+        assertEquals(listOf(listOf(SeatCode.ROW_2_LEFT, SeatCode.ROW_2_CENTER)), layout.foldedGroups.map { it.seats })
+        assertEquals(listOf("TRUNK", "FOLDED_SEAT"), layout.items.map { it.spaceKind })
+    }
+
+    @Test
     fun trunkItem_startsAtLeftRearCorner() {
         val rect = layout.items[0].rect
         val trunkRect = AvanteTopView.TRUNK

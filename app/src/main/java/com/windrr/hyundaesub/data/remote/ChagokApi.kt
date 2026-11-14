@@ -5,6 +5,8 @@ import com.windrr.hyundaesub.data.remote.model.CalculationResponse
 import com.windrr.hyundaesub.data.remote.model.DeviceRegistrationRequest
 import com.windrr.hyundaesub.data.remote.model.DeviceResponse
 import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
+import com.windrr.hyundaesub.data.remote.model.LoadingGuideRequest
+import com.windrr.hyundaesub.data.remote.model.LoadingGuideResponse
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
 import com.windrr.hyundaesub.data.remote.model.PlanSort
@@ -55,6 +57,13 @@ interface ChagokApi {
         @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
         @Body request: PreviewRequest,
     ): Response<ApiResponse<PreviewResponse>>
+
+    /** 고른 배치의 적재 안내 문구 (서버 AI). 배치 계산보다 오래 걸릴 수 있다 */
+    @POST("api/v1/ai/loading-guides")
+    suspend fun loadingGuide(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Body request: LoadingGuideRequest,
+    ): Response<ApiResponse<LoadingGuideResponse>>
 
     /** 폰 FCM 토큰 등록·갱신. device_id는 앱이 만든 UUID (같은 기기면 계속 같은 값) */
     @PUT("api/v1/notifications/devices/{device_id}")

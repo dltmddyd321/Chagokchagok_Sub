@@ -71,7 +71,7 @@
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
 | `POST /api/v1/ai/messages` | ⬜ | ⬜ | |
-| `POST /api/v1/ai/loading-guides` | ⬜ | ⬜ | 선택한 배치의 적재 순서 안내 문구 |
+| `POST /api/v1/ai/loading-guides` | 🔌 | ⬜ | 서브앱 배치 추천: 배치안이 나오면 곧장 배치안마다 `{preview_id, arrangement_id}`로 요청 → "가이드 보기" 화면. 2026-11-14 curl 확인: 지금은 `source=FALLBACK`, `steps` 빈 배열 → 앱이 싣는 순서로 기본 문구 생성 |
 
 ### 알림
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 2 (`PUT /notifications/devices`, `POST /calculations/preview`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
+| 🔌 연결만 | 3 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
 | 🟡 등록만 | 3 (`POST /plans`, `POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 15 | 12 |
+| ⬜ 남음 | 14 | 12 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: 서브앱 적재 안내 `POST /ai/loading-guides` 연결 (가이드 대기·가이드 화면).
 - 2026-11-14: 서브앱 배치 추천 화면에 `POST /calculations/preview` 연결 (추천 1~3 탭, load_order 순 페이드인).
 - 2026-11-14: Pleos 앱 시작 시 동기화 → 도착 감지 순서로 변경.
 - 2026-11-14: Pleos 홈에서 서버 계획·짐 목록을 기기 DB로 동기화 (`GET /plans` + `GET /plans/{id}`).

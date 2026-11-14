@@ -43,8 +43,18 @@ class RecommendViewModel(
 
     fun onIntent(intent: RecommendIntent) {
         when (intent) {
-            is RecommendIntent.SelectTab -> _state.update {
-                if (intent.index in it.layouts.indices) it.copy(selectedIndex = intent.index) else it
+            is RecommendIntent.SelectTab -> _state.update { current ->
+                if (intent.index !in current.layouts.indices) {
+                    current
+                } else {
+                    val next = current.copy(selectedIndex = intent.index)
+                    // 가이드를 보던 중 문구가 아직 안 온 배치로 바꾸면 기다리는 화면으로
+                    if (next.mode == RecommendMode.GUIDE && next.selectedGuide !is GuideStatus.Ready) {
+                        next.copy(mode = RecommendMode.GUIDE_LOADING)
+                    } else {
+                        next
+                    }
+                }
             }
             RecommendIntent.Retry -> load()
             RecommendIntent.Confirm -> {
@@ -53,8 +63,20 @@ class RecommendViewModel(
                 val arrangement = state.selected ?: return
                 send(RecommendEffect.Confirmed(previewId, arrangement.arrangementId))
             }
-            // TODO: POST /ai/loading-guides (선택한 배치의 적재 순서 안내) 연결
-            RecommendIntent.OpenGuide -> send(RecommendEffect.Toast("적재 가이드는 준비 중이에요."))
+            // 문구가 이미 와 있어도 기다리는 화면을 거친다 (진행 표시가 빨리 끝나고 가이드로)
+            RecommendIntent.OpenGuide -> _state.update {
+                if (it.phase == RecommendPhase.READY) it.copy(mode = RecommendMode.GUIDE_LOADING) else it
+            }
+            RecommendIntent.GuideLoadingFinished -> _state.update {
+                if (it.mode == RecommendMode.GUIDE_LOADING && it.selectedGuide is GuideStatus.Ready) {
+                    it.copy(mode = RecommendMode.GUIDE)
+                } else {
+                    it
+                }
+            }
+            RecommendIntent.BackToMap -> _state.update { it.copy(mode = RecommendMode.MAP) }
+            // TODO: 새 계획 만들기 동작은 추후 정의
+            RecommendIntent.NewPlan -> Unit
         }
     }
 
@@ -72,8 +94,16 @@ class RecommendViewModel(
                         .map { ArrangementLayoutMapper.map(it, snapshotItems) }
                     if (calculation.resultCode == RESULT_LAYOUT_FOUND && layouts.isNotEmpty()) {
                         _state.update {
-                            it.copy(phase = RecommendPhase.READY, previewId = result.data.previewId, layouts = layouts, selectedIndex = 0)
+                            it.copy(
+                                phase = RecommendPhase.READY,
+                                previewId = result.data.previewId,
+                                layouts = layouts,
+                                selectedIndex = 0,
+                                guides = layouts.associate { layout -> layout.arrangementId to GuideStatus.Loading },
+                            )
                         }
+                        // 배치가 나오면 곧장 배치안마다 적재 안내 요청 (계산보다 오래 걸릴 수 있음)
+                        layouts.forEach { layout -> loadGuide(result.data.previewId, layout) }
                     } else {
                         Log.i(TAG, "배치 없음: ${calculation.resultCode} required=${calculation.requiredInputs}")
                         send(RecommendEffect.NoLayout(calculation.resultCode))
@@ -91,6 +121,23 @@ class RecommendViewModel(
                     showError("네트워크 연결을 확인하고 다시 시도해 주세요.")
                 }
             }
+        }
+    }
+
+    /** 적재 안내 요청 (배치마다 새 Idempotency-Key). 서버가 단계를 비워 주거나 실패하면 앱이 싣는 순서로 기본 문구를 만든다 */
+    private fun loadGuide(previewId: String, layout: ArrangementLayoutUi) {
+        viewModelScope.launch {
+            val guide = when (val result = remote.loadingGuide(previewId, layout.arrangementId)) {
+                is ApiResult.Success -> result.data.also {
+                    Log.d(TAG, "적재 안내 ${layout.arrangementId}: source=${it.source} steps=${it.steps?.size}")
+                }
+                else -> {
+                    Log.w(TAG, "적재 안내 실패 ${layout.arrangementId}: $result")
+                    null
+                }
+            }
+            val steps = LoadingGuideBuilder.build(layout, guide)
+            _state.update { it.copy(guides = it.guides + (layout.arrangementId to GuideStatus.Ready(steps))) }
         }
     }
 

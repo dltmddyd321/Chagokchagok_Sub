@@ -101,9 +101,20 @@ fun RecommendRoute(
             }
         }
     }
-    BackHandler(onBack = onBack)
+    // 가이드 화면들에서 뒤로 → 배치 이미지, 배치 이미지에서 뒤로 → 짐 선택
+    BackHandler {
+        if (state.mode == RecommendMode.MAP) onBack() else viewModel.onIntent(RecommendIntent.BackToMap)
+    }
 
-    RecommendScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack, onClose = onClose)
+    when (state.mode) {
+        RecommendMode.MAP -> RecommendScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack, onClose = onClose)
+        RecommendMode.GUIDE_LOADING -> GuideLoadingScreen(
+            guideReady = state.selectedGuide is GuideStatus.Ready,
+            onExit = { viewModel.onIntent(RecommendIntent.BackToMap) },
+            onFinished = { viewModel.onIntent(RecommendIntent.GuideLoadingFinished) },
+        )
+        RecommendMode.GUIDE -> GuideScreen(state = state, onIntent = viewModel::onIntent)
+    }
 }
 
 @Composable
@@ -239,7 +250,7 @@ private fun TopBar(onClose: () -> Unit) {
 }
 
 @Composable
-private fun RecommendTabs(count: Int, selected: Int, onSelect: (Int) -> Unit) {
+internal fun RecommendTabs(count: Int, selected: Int, onSelect: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(count) { index ->
             val isSelected = index == selected
@@ -282,10 +293,14 @@ private fun StatusCard(content: @Composable () -> Unit) {
 
 /**
  * 탑뷰 이미지 위에 좌석 표시칸과 짐 사각형을 올린다.
- * 짐은 싣는 순서(load_order)대로 하나씩 페이드인. 탭을 바꾸면 처음부터 다시.
+ * - 배치 화면([guideSteps] 없음): 접는 좌석은 칸을 지우고, 짐은 싣는 순서(load_order)대로 하나씩 페이드인. 탭을 바꾸면 처음부터 다시.
+ * - 가이드 화면([guideSteps] 있음): 접을 자리를 점선 칸으로 표시하고, 단계 번호 배지를 붙인다. 애니메이션 없음.
  */
 @Composable
-private fun ArrangementView(layout: ArrangementLayoutUi) {
+internal fun ArrangementView(layout: ArrangementLayoutUi, guideSteps: List<GuideStepUi>? = null) {
+    val isGuide = guideSteps != null
+    val itemBadges = guideSteps.orEmpty().mapNotNull { step -> step.placementId?.let { it to step.number } }.toMap()
+    val foldBadges = guideSteps.orEmpty().mapNotNull { step -> step.foldedGroup?.let { it to step.number } }
     val image = ImageBitmap.imageResource(R.drawable.img_vehicle_avante_top_view_applied)
     BoxWithConstraints(
         modifier = Modifier
@@ -312,23 +327,61 @@ private fun ArrangementView(layout: ArrangementLayoutUi) {
                 label = if (seat.mark == SeatMark.BOARDING) "탑승" else "좌석",
             )
         }
-        layout.items.forEach { item ->
-            // 탭(배치안)이 바뀌면 key가 바뀌어 애니메이션을 처음부터
-            key(layout.arrangementId, item.placementId) {
-                val alpha = remember { Animatable(0f) }
-                LaunchedEffect(Unit) {
-                    delay(ITEM_FIRST_DELAY_MS + item.order * ITEM_STEP_MS)
-                    alpha.animateTo(1f, tween(ITEM_FADE_MS))
-                }
-                OverlayBox(
-                    rect = item.rect,
-                    scale = scale,
-                    fill = ItemFill,
-                    label = item.name,
-                    modifier = Modifier.graphicsLayer { this.alpha = alpha.value },
-                )
+        if (isGuide) {
+            // 접을 자리: 어두운 점선 칸 (짐이 그 위에 놓이면 짐이 덮는다)
+            layout.foldedGroups.forEach { group ->
+                group.markRects.forEach { rect -> OverlayBox(rect = rect, scale = scale, fill = FoldedMarkFill, label = "좌석") }
             }
         }
+        layout.items.forEach { item ->
+            if (isGuide) {
+                OverlayBox(rect = item.rect, scale = scale, fill = ItemFill, label = item.name)
+            } else {
+                // 탭(배치안)이 바뀌면 key가 바뀌어 애니메이션을 처음부터
+                key(layout.arrangementId, item.placementId) {
+                    val alpha = remember { Animatable(0f) }
+                    LaunchedEffect(Unit) {
+                        delay(ITEM_FIRST_DELAY_MS + item.order * ITEM_STEP_MS)
+                        alpha.animateTo(1f, tween(ITEM_FADE_MS))
+                    }
+                    OverlayBox(
+                        rect = item.rect,
+                        scale = scale,
+                        fill = ItemFill,
+                        label = item.name,
+                        modifier = Modifier.graphicsLayer { this.alpha = alpha.value },
+                    )
+                }
+            }
+        }
+        // 단계 번호 배지: 칸의 왼쪽 위 모서리
+        foldBadges.forEach { (group, number) ->
+            group.markRects.firstOrNull()?.let { StepBadge(number = number, rect = it, scale = scale) }
+        }
+        layout.items.forEach { item ->
+            itemBadges[item.placementId]?.let { StepBadge(number = it, rect = item.rect, scale = scale) }
+        }
+    }
+}
+
+/** 이미지 위 단계 번호 (흰 테두리 남색 원) */
+@Composable
+private fun StepBadge(number: Int, rect: PxRect, scale: Dp) {
+    Box(
+        modifier = Modifier
+            .offset(
+                x = scale * (rect.left - AvanteTopView.CROP_LEFT) - BADGE_SIZE / 3,
+                y = scale * (rect.top - AvanteTopView.CROP_TOP) - BADGE_SIZE / 3,
+            )
+            .size(BADGE_SIZE)
+            .clip(CircleShape)
+            .background(Color.White)
+            .padding(1.5.dp)
+            .clip(CircleShape)
+            .background(TabSelectedBg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = "$number", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -394,6 +447,8 @@ private const val ITEM_FADE_MS = 400
 
 /** 아주 작은 짐도 보이도록 최소 크기 */
 private val MIN_BOX = 14.dp
+private val BADGE_SIZE = 16.dp
+private val FoldedMarkFill = Color(0x99202833)
 
 private val CardShape = RoundedCornerShape(16.dp)
 private val BoxShape = RoundedCornerShape(4.dp)

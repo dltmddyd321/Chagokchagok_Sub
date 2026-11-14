@@ -2,6 +2,8 @@ package com.windrr.hyundaesub.data.remote
 
 import com.windrr.hyundaesub.data.remote.model.CalculationRequest
 import com.windrr.hyundaesub.data.remote.model.CalculationResponse
+import com.windrr.hyundaesub.data.remote.model.LoadingGuideRequest
+import com.windrr.hyundaesub.data.remote.model.LoadingGuideResponse
 import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
@@ -39,4 +41,12 @@ class PlanRemoteRepository(private val api: ChagokApi = ApiClient.chagokApi) {
         request: PreviewRequest,
         idempotencyKey: String,
     ): ApiResult<PreviewResponse> = apiCall { api.previewCalculation(idempotencyKey, request) }
+
+    /** 배치 하나의 적재 안내. 배치마다 새 Idempotency-Key */
+    suspend fun loadingGuide(
+        previewId: String,
+        arrangementId: String,
+        idempotencyKey: String = UUID.randomUUID().toString(),
+    ): ApiResult<LoadingGuideResponse> =
+        apiCall { api.loadingGuide(idempotencyKey, LoadingGuideRequest(previewId, arrangementId)) }
 }

@@ -30,13 +30,22 @@ data class ItemBox(
     val name: String,
     val order: Int,
     val rect: PxRect,
+    /** 놓인 공간 종류 (TRUNK / SEAT / FOLDED_SEAT) — 기본 안내 문구용 */
+    val spaceKind: String = "",
 )
+
+/** 이 배치에서 함께 접는 좌석 묶음 (예: 뒷좌석 왼쪽+가운데) */
+data class FoldedSeatGroup(val seats: List<SeatCode>) {
+    val markRects: List<PxRect> get() = seats.map(AvanteTopView::seatMarkRect)
+}
 
 data class ArrangementLayoutUi(
     val arrangementId: String,
     val seats: List<SeatBox>,
     /** 싣는 순서(load_order)대로 */
     val items: List<ItemBox>,
+    /** 접어야 하는 좌석 묶음 (가이드 화면에서 접을 자리 표시) */
+    val foldedGroups: List<FoldedSeatGroup> = emptyList(),
 )
 
 /**
@@ -76,11 +85,16 @@ internal object ArrangementLayoutMapper {
                 val area = spaceRect(space) ?: return@mapNotNull null
                 val (extentX, extentY) = footprint(item, placement.orientation)
                 val rect = toImageRect(area, space, placement.xCm, placement.yCm, extentX, extentY)
-                Triple(placement.placementId, item.name?.takeIf { it.isNotBlank() } ?: "짐", rect)
+                ItemBox(placement.placementId, item.name?.takeIf { it.isNotBlank() } ?: "짐", 0, rect, space.kind)
             }
-            .mapIndexed { index, (placementId, name, rect) -> ItemBox(placementId, name, index, rect) }
+            .mapIndexed { index, box -> box.copy(order = index) }
 
-        return ArrangementLayoutUi(arrangement.arrangementId, seats, items)
+        val foldedGroups = arrangement.packingSpaces.orEmpty()
+            .filter { it.kind == KIND_FOLDED_SEAT }
+            .map { space -> FoldedSeatGroup(space.seatCodes.orEmpty().mapNotNull(::seatOf).filter { it in AvanteSeats.SELECTABLE }) }
+            .filter { it.seats.isNotEmpty() }
+
+        return ArrangementLayoutUi(arrangement.arrangementId, seats, items, foldedGroups)
     }
 
     /** 공간이 이미지에서 차지하는 영역. 모르는 공간이면 null (그리지 않음) */
@@ -125,9 +139,9 @@ internal object ArrangementLayoutMapper {
 
     private fun seatOf(code: String): SeatCode? = SeatCode.entries.firstOrNull { it.name == code }
 
-    private const val KIND_TRUNK = "TRUNK"
-    private const val KIND_SEAT = "SEAT"
-    private const val KIND_FOLDED_SEAT = "FOLDED_SEAT"
+    const val KIND_TRUNK = "TRUNK"
+    const val KIND_SEAT = "SEAT"
+    const val KIND_FOLDED_SEAT = "FOLDED_SEAT"
 }
 
 /**
