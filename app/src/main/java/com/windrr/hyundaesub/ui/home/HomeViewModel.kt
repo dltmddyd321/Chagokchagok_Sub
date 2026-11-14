@@ -3,8 +3,8 @@ package com.windrr.hyundaesub.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.windrr.hyundaesub.data.dummy.DummyPlans
 import com.windrr.hyundaesub.data.local.AppDatabase
+import com.windrr.hyundaesub.data.local.DummyDataCleanup
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +22,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            DummyPlans.seedIfNeeded(application, db)
+            DummyDataCleanup.run(db)
         }
         viewModelScope.launch {
             combine(db.planDao().observePlans(), db.planDao().observeFavoritePlans()) { recent, favorites ->
