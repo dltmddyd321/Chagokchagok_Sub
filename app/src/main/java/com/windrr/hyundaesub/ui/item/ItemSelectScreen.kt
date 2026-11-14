@@ -25,6 +25,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,9 +39,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
+import com.windrr.hyundaesub.ui.component.ExitConfirmDialog
 import com.windrr.hyundaesub.ui.component.ItemCard
-import com.windrr.hyundaesub.ui.component.StepIndicator
 import com.windrr.hyundaesub.ui.component.LOAD_FLOW_STEPS
+import com.windrr.hyundaesub.ui.component.StepIndicator
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
@@ -66,6 +71,17 @@ fun ItemSelectScreen(
     onNext: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    // ✕는 홈까지 나가 버리므로 한 번 확인받는다
+    var showExitConfirm by rememberSaveable { mutableStateOf(false) }
+    if (showExitConfirm) {
+        ExitConfirmDialog(
+            onContinue = { showExitConfirm = false },
+            onExit = {
+                showExitConfirm = false
+                onClose()
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -88,7 +104,7 @@ fun ItemSelectScreen(
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(CloseButtonBg)
-                    .clickable(onClick = onClose),
+                    .clickable { showExitConfirm = true },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(text = "✕", color = ChagokTextSecondary, fontSize = 14.sp)
