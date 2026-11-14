@@ -19,6 +19,8 @@ class NotificationApiLiveTest {
     @Test
     fun registerThenUnregisterDevice_onRealServer() = runBlocking {
         assumeTrue("서버 계정이 local.properties에 없어 건너뜀", BuildConfig.CHAGOK_API_USERNAME.isNotBlank())
+        // 알림 API는 X-Notification-Key가 필수 (없으면 401 NOTIFICATION_UNAUTHORIZED, 2026-11-14 확인)
+        assumeTrue("local.properties에 CHAGOK_NOTIFICATION_KEY가 없어 건너뜀", BuildConfig.CHAGOK_NOTIFICATION_KEY.isNotBlank())
         val repository = NotificationRemoteRepository()
         val deviceId = UUID.randomUUID().toString()
 
