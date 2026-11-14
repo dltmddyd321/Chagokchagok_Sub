@@ -118,6 +118,15 @@ class MainViewModel : ViewModel() {
                     pickedItems = it.pickedItems + intent.item,
                 )
             }
+            MainIntent.NoLayoutFound -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
+            is MainIntent.ArrangementConfirmed -> _state.update {
+                it.copy(
+                    route = MainRoute.PLAN_SAVE,
+                    confirmedPreviewId = intent.previewId,
+                    confirmedArrangementId = intent.arrangementId,
+                )
+            }
+            MainIntent.BackToRecommend -> _state.update { it.copy(route = MainRoute.RECOMMEND) }
             MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
         }
@@ -128,11 +137,19 @@ class MainViewModel : ViewModel() {
     }
 
     /**
-     * 배치 추천 요청. 체크한 짐(selected)만, 꼭 가져갈 짐은 required_quantity로 보낸다.
-     * TODO: 계획 저장 + 서버 배치 계산 연결. 성공 화면 전이라 지금은 항상 실패 화면으로
+     * 배치 추천 요청 → 추천 화면이 POST /calculations/preview.
+     * 체크한 짐(selected)만, 꼭 가져갈 짐은 required_quantity로 보낸다.
+     * 조건이 바뀌어 다시 계산할 때마다 recommendId를 올려 새 ViewModel(새 Idempotency-Key)로 요청한다.
      */
     private fun requestRecommendation() {
-        _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
+        _state.update {
+            it.copy(
+                route = MainRoute.RECOMMEND,
+                recommendId = it.recommendId + 1,
+                confirmedPreviewId = null,
+                confirmedArrangementId = null,
+            )
+        }
     }
 
     private fun updatePicked(key: String, transform: (PickedItem) -> PickedItem) {

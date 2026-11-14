@@ -6,6 +6,8 @@ import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
 import com.windrr.hyundaesub.data.remote.model.PlanSort
+import com.windrr.hyundaesub.data.remote.model.PreviewRequest
+import com.windrr.hyundaesub.data.remote.model.PreviewResponse
 import java.util.UUID
 
 class PlanRemoteRepository(private val api: ChagokApi = ApiClient.chagokApi) {
@@ -28,4 +30,13 @@ class PlanRemoteRepository(private val api: ChagokApi = ApiClient.chagokApi) {
         request: CalculationRequest,
         idempotencyKey: String = UUID.randomUUID().toString(),
     ): ApiResult<CalculationResponse> = apiCall { api.createCalculation(idempotencyKey, planId, request) }
+
+    /**
+     * 배치 미리 계산. [idempotencyKey]는 같은 요청을 재시도할 때만 다시 쓰고,
+     * 조건(짐·좌석)을 바꿔 다시 계산할 때는 새로 만든다.
+     */
+    suspend fun previewCalculation(
+        request: PreviewRequest,
+        idempotencyKey: String,
+    ): ApiResult<PreviewResponse> = apiCall { api.previewCalculation(idempotencyKey, request) }
 }

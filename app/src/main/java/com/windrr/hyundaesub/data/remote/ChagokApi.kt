@@ -8,6 +8,8 @@ import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
 import com.windrr.hyundaesub.data.remote.model.PlanSort
+import com.windrr.hyundaesub.data.remote.model.PreviewRequest
+import com.windrr.hyundaesub.data.remote.model.PreviewResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -46,6 +48,13 @@ interface ChagokApi {
         @Query("category") category: String? = null,
         @Query("favorite") favorite: Boolean? = null,
     ): Response<ApiResponse<PlanListResponse>>
+
+    /** 저장 전 배치 미리 계산 (새 계획). 결과의 preview_id로 POST /plans 저장 */
+    @POST("api/v1/calculations/preview")
+    suspend fun previewCalculation(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Body request: PreviewRequest,
+    ): Response<ApiResponse<PreviewResponse>>
 
     /** 폰 FCM 토큰 등록·갱신. device_id는 앱이 만든 UUID (같은 기기면 계속 같은 값) */
     @PUT("api/v1/notifications/devices/{device_id}")

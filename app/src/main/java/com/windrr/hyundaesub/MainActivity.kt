@@ -17,6 +17,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.push.PushNotifier
 import com.windrr.hyundaesub.push.PushTokenSync
+import com.windrr.hyundaesub.ui.plan.PlanSaveRoute
+import com.windrr.hyundaesub.ui.recommend.RecommendInput
+import com.windrr.hyundaesub.ui.recommend.RecommendRoute
 import com.windrr.hyundaesub.ui.item.ItemSelectScreen
 import com.windrr.hyundaesub.ui.item.confirm.ItemConfirmRoute
 import com.windrr.hyundaesub.ui.item.newitem.NewItemGuideScreen
@@ -88,6 +91,26 @@ class MainActivity : ComponentActivity() {
                         onBack = { viewModel.onIntent(MainIntent.BackFromConfirm) },
                         onSaved = { viewModel.onIntent(MainIntent.ItemConfirmed(it)) },
                         viewModel = viewModel(key = "confirm-${state.confirmId}"),
+                    )
+                    MainRoute.RECOMMEND -> RecommendRoute(
+                        input = RecommendInput(
+                            localVehicleId = state.selectedVehicleId,
+                            occupiedSeats = state.occupiedSeats,
+                            items = state.pickedItems,
+                        ),
+                        onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
+                        onClose = { viewModel.onIntent(MainIntent.BackToTabs) },
+                        onNoLayout = { viewModel.onIntent(MainIntent.NoLayoutFound) },
+                        onConfirmed = { previewId, arrangementId ->
+                            viewModel.onIntent(MainIntent.ArrangementConfirmed(previewId, arrangementId))
+                        },
+                        viewModel = viewModel(key = "recommend-${state.recommendId}"),
+                    )
+                    MainRoute.PLAN_SAVE -> PlanSaveRoute(
+                        onBack = { viewModel.onIntent(MainIntent.BackToRecommend) },
+                        // TODO: POST /plans {source_preview_id, selected_arrangement_id} → plan_id, 이후 이름·카테고리·메모는 PATCH metadata
+                        onSaved = { },
+                        viewModel = viewModel(key = "plan-save-${state.recommendId}"),
                     )
                     MainRoute.LAYOUT_FAILED -> LayoutFailedScreen(
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },

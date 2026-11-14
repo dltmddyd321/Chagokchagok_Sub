@@ -41,6 +41,12 @@ enum class MainRoute {
     /** AR 촬영 후 측정값 확인 / 직접 입력 */
     ITEM_CONFIRM,
 
+    /** 배치 추천 (POST /calculations/preview 결과) */
+    RECOMMEND,
+
+    /** 배치 확인 후 계획 이름·카테고리·메모 입력 */
+    PLAN_SAVE,
+
     /** 배치 추천 결과 없음 */
     LAYOUT_FAILED,
 
@@ -84,6 +90,11 @@ data class MainUiState(
     val conditionChanges: Set<ConditionChange> = emptySet(),
     /** 좌석 다시 선택에 들어올 때마다 증가 — 좌석 ViewModel을 새로 만드는 키 */
     val seatReselectId: Int = 0,
+    /** 배치 추천을 새로 요청할 때마다 증가 — 추천 ViewModel(= 새 Idempotency-Key)을 새로 만드는 키 */
+    val recommendId: Int = 0,
+    /** 추천 화면에서 확인한 미리보기·배치. 계획 저장 때 POST /plans(source_preview_id, selected_arrangement_id) */
+    val confirmedPreviewId: String? = null,
+    val confirmedArrangementId: String? = null,
 )
 
 sealed interface MainIntent {
@@ -174,6 +185,15 @@ sealed interface MainIntent {
 
     /** 확인 화면에서 저장 → 짐 목록에 담고 짐 선택으로 */
     data class ItemConfirmed(val item: PickedItem) : MainIntent
+
+    /** 추천 화면: 배치를 못 찾음 → 실패 화면 */
+    data object NoLayoutFound : MainIntent
+
+    /** 추천 화면 확인 → 계획 저장 */
+    data class ArrangementConfirmed(val previewId: String, val arrangementId: String) : MainIntent
+
+    /** 계획 저장에서 뒤로 → 추천 화면 */
+    data object BackToRecommend : MainIntent
 
     /** 전체 화면에서 뒤로 → 탭 화면 */
     data object BackToTabs : MainIntent
