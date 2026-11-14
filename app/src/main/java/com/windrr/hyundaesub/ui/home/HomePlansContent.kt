@@ -177,21 +177,14 @@ private fun HeroSection(recentPlans: List<PlanCardUi>, onNewPlan: () -> Unit) {
 @Composable
 private fun LogoRow(modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
+        // 앱 아이콘과 같은 로고
+        Image(
+            painter = painterResource(R.drawable.img_app_logo),
+            contentDescription = null,
             modifier = Modifier
                 .size(32.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(Color.White),
-            contentAlignment = Alignment.Center,
-        ) {
-            // 임시 로고: 로고 에셋 받으면 교체
-            Icon(
-                painter = painterResource(R.drawable.ic_car),
-                contentDescription = null,
-                tint = ChagokNavy,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+                .clip(RoundedCornerShape(9.dp)),
+        )
         Spacer(Modifier.width(10.dp))
         Text(text = "차곡차곡", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
     }

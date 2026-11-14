@@ -117,22 +117,15 @@ private fun HomeEmptyContent(onIntent: (MainIntent) -> Unit) {
 @Composable
 private fun LogoRow() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
+        // 앱 아이콘과 같은 로고
+        Image(
+            painter = painterResource(R.drawable.img_app_logo),
+            contentDescription = null,
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(ChagokNavy),
-            contentAlignment = Alignment.Center,
-        ) {
-            // 임시 로고: 로고 에셋 받으면 교체
-            Icon(
-                painter = painterResource(R.drawable.ic_car),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-        Spacer(Modifier.width(10.dp))
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp)),
+        )
+        Spacer(Modifier.width(12.dp))
         Text(
             text = "차곡차곡",
             color = ChagokTextPrimary,
