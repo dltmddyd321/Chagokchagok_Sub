@@ -33,7 +33,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.data.local.entity.SeatCode
 import com.windrr.hyundaesub.ui.component.ChagokPrimaryButton
+import com.windrr.hyundaesub.ui.component.ExitConfirmDialog
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
@@ -101,9 +104,9 @@ fun GuideLoadingScreen(
     ) {
         BackArrow(onClick = onExit)
         Spacer(Modifier.height(20.dp))
-        Text(text = "가능한 배치를 찾고 있어요", color = ChagokTextPrimary, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+        Text(text = "가이드를 만들고 있어요.", color = ChagokTextPrimary, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(10.dp))
-        Text(text = "등록한 짐 크기와 탑승 조건을 비교해요.", color = ChagokTextSecondary, fontSize = 15.sp)
+        Text(text = "서비스 이용 방법을 하나씩 정리하고 있어요.", color = ChagokTextSecondary, fontSize = 15.sp)
 
         Column(
             modifier = Modifier
@@ -231,7 +234,19 @@ private fun SparkleOrb() {
 fun GuideScreen(
     state: RecommendUiState,
     onIntent: (RecommendIntent) -> Unit,
+    onClose: () -> Unit,
 ) {
+    // 시안: 배치 화면과 같은 상단(단계 점 + ✕). ✕는 종료 확인을 거쳐 홈으로, 뒤로가기는 배치 이미지로
+    var showExitConfirm by rememberSaveable { mutableStateOf(false) }
+    if (showExitConfirm) {
+        ExitConfirmDialog(
+            onContinue = { showExitConfirm = false },
+            onExit = {
+                showExitConfirm = false
+                onClose()
+            },
+        )
+    }
     val layout = state.selected
     val steps = (state.selectedGuide as? GuideStatus.Ready)?.steps.orEmpty()
     Column(
@@ -243,8 +258,8 @@ fun GuideScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
-        BackArrow(onClick = { onIntent(RecommendIntent.BackToMap) })
-        Spacer(Modifier.height(20.dp))
+        TopBar(onClose = { showExitConfirm = true })
+        Spacer(Modifier.height(28.dp))
         Text(text = "이 순서대로 실어 보세요", color = ChagokTextPrimary, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(10.dp))
         Text(text = "배치가 가능해요.", color = ChagokTextSecondary, fontSize = 15.sp)
@@ -303,7 +318,7 @@ private fun GuideStepsCard(steps: List<GuideStepUi>) {
 }
 
 @Composable
-private fun OutlinePillButton(text: String, onClick: () -> Unit) {
+internal fun OutlinePillButton(text: String, onClick: () -> Unit) {
     val shape = RoundedCornerShape(percent = 50)
     Box(
         modifier = Modifier
@@ -393,6 +408,7 @@ private fun GuideScreenPreview() {
                 guides = mapOf("a2" to GuideStatus.Ready(steps)),
             ),
             onIntent = {},
+            onClose = {},
         )
     }
 }

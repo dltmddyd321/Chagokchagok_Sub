@@ -26,8 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,7 +124,7 @@ private fun RecommendModeContent(
             onExit = { viewModel.onIntent(RecommendIntent.BackToMap) },
             onFinished = { viewModel.onIntent(RecommendIntent.GuideLoadingFinished) },
         )
-        RecommendMode.GUIDE -> GuideScreen(state = state, onIntent = viewModel::onIntent)
+        RecommendMode.GUIDE -> GuideScreen(state = state, onIntent = viewModel::onIntent, onClose = onClose)
     }
 }
 
@@ -203,33 +201,20 @@ fun RecommendScreen(
                         onSelect = { onIntent(RecommendIntent.SelectTab(it)) },
                     )
                     Spacer(Modifier.height(20.dp))
-                    state.selected?.let { ArrangementView(layout = it) }
-                    Spacer(Modifier.height(12.dp))
-                    GuideButton(onClick = { onIntent(RecommendIntent.OpenGuide) })
+                    state.selected?.let { ArrangementView(layout = it, onOpenGuide = { onIntent(RecommendIntent.OpenGuide) }) }
                 }
             }
             Spacer(Modifier.height(24.dp))
         }
 
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Button(
-                onClick = onBack,
-                shape = RoundedCornerShape(percent = 50),
-                colors = ButtonDefaults.buttonColors(containerColor = PrevButtonBg, contentColor = ChagokTextPrimary),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
-            ) {
-                Text(text = "이전", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+        // 시안: 새 계획 만들기(배치 다시 계산) / 이 배치 선택 (가이드 화면과 같은 버튼)
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            OutlinePillButton(text = "새 계획 만들기", onClick = { onIntent(RecommendIntent.NewPlan) })
+            Spacer(Modifier.height(12.dp))
             ChagokPrimaryButton(
-                text = "확인",
+                text = "이 배치 선택",
                 onClick = { onIntent(RecommendIntent.Confirm) },
                 enabled = state.phase == RecommendPhase.READY,
-                modifier = Modifier.weight(1f),
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -237,7 +222,7 @@ fun RecommendScreen(
 }
 
 @Composable
-private fun TopBar(onClose: () -> Unit) {
+internal fun TopBar(onClose: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -307,7 +292,12 @@ private fun StatusCard(content: @Composable () -> Unit) {
  * - 가이드 화면([guideSteps] 있음): 접을 자리를 점선 칸으로 표시하고, 단계 번호 배지를 붙인다. 애니메이션 없음.
  */
 @Composable
-internal fun ArrangementView(layout: ArrangementLayoutUi, guideSteps: List<GuideStepUi>? = null) {
+internal fun ArrangementView(
+    layout: ArrangementLayoutUi,
+    guideSteps: List<GuideStepUi>? = null,
+    /** 있으면 이미지 오른쪽 아래에 "가이드 보기" 알약 버튼 */
+    onOpenGuide: (() -> Unit)? = null,
+) {
     val isGuide = guideSteps != null
     val itemBadges = guideSteps.orEmpty().mapNotNull { step -> step.placementId?.let { it to step.number } }.toMap()
     val foldBadges = guideSteps.orEmpty().mapNotNull { step -> step.foldedGroup?.let { it to step.number } }
@@ -370,6 +360,19 @@ internal fun ArrangementView(layout: ArrangementLayoutUi, guideSteps: List<Guide
         }
         layout.items.forEach { item ->
             itemBadges[item.placementId]?.let { StepBadge(number = it, rect = item.rect, scale = scale) }
+        }
+        onOpenGuide?.let { open ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(GuidePillBg)
+                    .clickable(onClick = open)
+                    .padding(horizontal = 16.dp, vertical = 9.dp),
+            ) {
+                Text(text = "가이드 보기", color = ChagokTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -434,23 +437,6 @@ private fun OverlayBox(rect: PxRect, scale: Dp, fill: Color, label: String, modi
     }
 }
 
-@Composable
-private fun GuideButton(onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .clip(shape)
-            .background(Color.White)
-            .border(1.dp, ChagokCardBorder, shape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = "가이드 보기", color = ChagokTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
 private const val ITEM_FIRST_DELAY_MS = 250L
 private const val ITEM_STEP_MS = 450L
 private const val ITEM_FADE_MS = 400
@@ -459,6 +445,7 @@ private const val ITEM_FADE_MS = 400
 private val MIN_BOX = 14.dp
 private val BADGE_SIZE = 16.dp
 private val FoldedMarkFill = Color(0x99202833)
+private val GuidePillBg = Color(0xF2EEF1F6)
 
 private val CardShape = RoundedCornerShape(16.dp)
 private val BoxShape = RoundedCornerShape(4.dp)
@@ -468,7 +455,6 @@ private val BoardingFill = Color(0xCC5D6672)
 private val EmptySeatFill = Color(0xB38C9199)
 private val ItemFill = Color(0xE62C5DA6)
 private val TabSelectedBg = Color(0xFF05082B)
-private val PrevButtonBg = Color(0xFFDDE3EE)
 private val CloseButtonBg = Color(0xFFE3E7EF)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
