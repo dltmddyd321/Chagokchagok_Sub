@@ -93,7 +93,7 @@ private fun HomeEmptyContent(onIntent: (MainIntent) -> Unit) {
         LogoRow()
         Spacer(Modifier.height(28.dp))
         Text(
-            text = "짐 싣기 전,\n미리 확인하세요.",
+            text = "오늘은 어떤\n짐을 옮길 예정인가요?",
             color = ChagokTextPrimary,
             fontSize = 30.sp,
             lineHeight = 40.sp,
@@ -101,7 +101,7 @@ private fun HomeEmptyContent(onIntent: (MainIntent) -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "내 차에 맞는 적재 방법을 알아보세요.",
+            text = "내 차에 맞는 짐 배치 방법을 알아보세요.",
             color = ChagokTextSecondary,
             fontSize = 16.sp,
         )
@@ -169,7 +169,7 @@ private fun HeroCard(onStartClick: () -> Unit) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "짐을 등록하고 적재 배치를 확인하세요.",
+                text = "짐을 등록하면 내 차에 맞는\n배치 방법을 안내해 드려요.",
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 15.sp,
             )
