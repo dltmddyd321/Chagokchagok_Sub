@@ -75,8 +75,12 @@ class RecommendViewModel(
                 }
             }
             RecommendIntent.BackToMap -> _state.update { it.copy(mode = RecommendMode.MAP) }
-            // TODO: 새 계획 만들기 동작은 추후 정의
-            RecommendIntent.NewPlan -> Unit
+            // 새 계획 만들기: 같은 조건으로 배치 계산을 처음부터 다시 (새 계산 요청이라 새 Idempotency-Key)
+            RecommendIntent.NewPlan -> {
+                idempotencyKey = UUID.randomUUID().toString()
+                _state.value = RecommendUiState()
+                load()
+            }
         }
     }
 
@@ -137,7 +141,10 @@ class RecommendViewModel(
                 }
             }
             val steps = LoadingGuideBuilder.build(layout, guide)
-            _state.update { it.copy(guides = it.guides + (layout.arrangementId to GuideStatus.Ready(steps))) }
+            _state.update {
+                // 그 사이 "새 계획 만들기"로 다시 계산했으면 예전 배치의 문구는 버린다
+                if (it.previewId != previewId) it else it.copy(guides = it.guides + (layout.arrangementId to GuideStatus.Ready(steps)))
+            }
         }
     }
 

@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -106,6 +105,20 @@ fun RecommendRoute(
         if (state.mode == RecommendMode.MAP) onBack() else viewModel.onIntent(RecommendIntent.BackToMap)
     }
 
+    when {
+        // 배치 계산 중 (처음 · 새 계획 만들기 · 다시 시도): 전체 화면 로딩
+        state.phase == RecommendPhase.LOADING -> ArrangeLoadingScreen(onClose = onClose)
+        else -> RecommendModeContent(state = state, viewModel = viewModel, onBack = onBack, onClose = onClose)
+    }
+}
+
+@Composable
+private fun RecommendModeContent(
+    state: RecommendUiState,
+    viewModel: RecommendViewModel,
+    onBack: () -> Unit,
+    onClose: () -> Unit,
+) {
     when (state.mode) {
         RecommendMode.MAP -> RecommendScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack, onClose = onClose)
         RecommendMode.GUIDE_LOADING -> GuideLoadingScreen(
@@ -163,11 +176,8 @@ fun RecommendScreen(
             Spacer(Modifier.height(24.dp))
 
             when (state.phase) {
-                RecommendPhase.LOADING -> StatusCard {
-                    CircularProgressIndicator(color = Color.White)
-                    Spacer(Modifier.height(16.dp))
-                    Text(text = "짐을 실을 방법을 찾고 있어요", color = Color.White, fontSize = 15.sp)
-                }
+                // 계산 중에는 전체 화면 로딩(ArrangeLoadingScreen)이 대신 보인다
+                RecommendPhase.LOADING -> Unit
                 RecommendPhase.ERROR -> StatusCard {
                     Text(
                         text = state.errorMessage ?: "배치를 계산하지 못했어요.",
