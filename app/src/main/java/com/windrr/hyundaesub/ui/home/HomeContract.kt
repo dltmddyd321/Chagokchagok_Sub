@@ -17,7 +17,7 @@ data class PlanCardUi(
     val itemsInline: String,
     /** 즐겨찾기 카드용: "캐리어 1, 캠핑의자 2, 배낭 외 2" */
     val itemsShort: String,
-    /** "운전자 포함 3명 · 더 뉴 아반떼 하이브리드" */
+    /** "운전자 포함 3명 · 디 올 뉴 투싼 하이브리드" */
     val passengerLine: String,
     val isFavorite: Boolean,
 )

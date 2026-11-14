@@ -201,7 +201,7 @@ private fun VehicleSelectScreenPreview() {
                 myCar = VehicleEntity(
                     vehicleId = "avante_cn8",
                     isMain = true,
-                    name = "더 뉴 아반떼 하이브리드",
+                    name = "디 올 뉴 투싼 하이브리드",
                     desc = "5인승 SUV",
                 ),
             ),

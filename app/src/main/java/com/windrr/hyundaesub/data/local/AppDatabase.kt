@@ -68,24 +68,37 @@ abstract class AppDatabase : RoomDatabase() {
     }
 }
 
-/** 1차 프로토타입은 이 차량 하나만 쓴다 */
+/**
+ * 1차 프로토타입은 이 차량 하나만 쓴다.
+ * vehicle_id는 기존 계획이 참조하는 내부 키라 그대로 두고 표시 이름만 바꾼다.
+ */
 object DefaultVehicles {
     val AVANTE = VehicleEntity(
         vehicleId = "avante_cn8",
         isMain = true,
-        name = "더 뉴 아반떼 하이브리드",
+        name = "디 올 뉴 투싼 하이브리드",
         desc = "5인승 SUV",
     )
     val ALL = listOf(AVANTE)
 }
 
-/** DB 최초 생성 시 기본 차량을 넣는다 */
+/** DB 최초 생성 시 기본 차량을 넣고, 열 때마다 기본 차량 이름·설명을 최신 값으로 맞춘다 */
 private object SeedVehicles : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         DefaultVehicles.ALL.forEach {
             db.execSQL(
                 "INSERT OR IGNORE INTO vehicle (vehicle_id, is_main, name, description) VALUES (?, ?, ?, ?)",
                 arrayOf(it.vehicleId, if (it.isMain) 1 else 0, it.name, it.desc),
+            )
+        }
+    }
+
+    /** 이미 설치된 앱도 기본 차량 표시값이 바뀌면 따라가게 (대표 차량 여부는 그대로) */
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        DefaultVehicles.ALL.forEach {
+            db.execSQL(
+                "UPDATE vehicle SET name = ?, description = ? WHERE vehicle_id = ?",
+                arrayOf(it.name, it.desc, it.vehicleId),
             )
         }
     }

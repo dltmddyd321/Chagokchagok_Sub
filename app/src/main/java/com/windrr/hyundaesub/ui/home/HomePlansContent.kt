@@ -392,7 +392,7 @@ private fun HomePlansContentPreview() {
             dDay = dDay,
             itemsInline = "유모차 1 · 캐리어 1 · 캠핑의자 2",
             itemsShort = "캐리어 1, 캠핑의자 2, 배낭 외 2",
-            passengerLine = "운전자 포함 3명 · 더 뉴 아반떼 하이브리드",
+            passengerLine = "운전자 포함 3명 · 디 올 뉴 투싼 하이브리드",
             isFavorite = fav,
         )
     }
