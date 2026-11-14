@@ -45,7 +45,7 @@
 | `GET /api/v1/plans` | ✅ | 🔌 | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 앱 시작 시 `PlanSyncRepository`가 **최신 1개**(`limit=1`)를 기기 DB로 동기화 → 홈 최신 계획 카드·도착 감지 |
 | `GET /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
 | `PUT /api/v1/plans/{plan_id}` | ⬜ | ⬜ | 계획 전체 변경 (`expected_revision`) |
-| `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision). 홈 즐겨찾기 별은 아직 미연결 |
+| `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision) / 홈 즐겨찾기 별: `{expected_revision, is_favorite}`만 보내고(이름 등은 생략) 끝나면 서버 목록 다시 조회 |
 | `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | ⬜ | 사용할 배치안 선택 |
 
 ### 적재 계산
@@ -91,6 +91,7 @@
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: 서브앱 홈 즐겨찾기 별을 `PATCH metadata`로 연결.
 - 2026-11-14: Pleos 제품명 말하기에 `POST /products/search` 연결 (찾은 제품 규격 창).
 - 2026-11-14: Pleos 계획 동기화를 최신 1개로 변경 (주행 중 서비스), 홈 최신 계획 카드.
 - 2026-11-14: 서브앱 계획 저장 연결 (`POST /plans` 미리보기 결과로 생성 → `PATCH metadata`), 저장 완료 후 홈 서버 목록 갱신.
