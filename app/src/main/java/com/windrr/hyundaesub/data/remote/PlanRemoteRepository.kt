@@ -5,6 +5,8 @@ import com.windrr.hyundaesub.data.remote.model.CalculationResponse
 import com.windrr.hyundaesub.data.remote.model.LoadingGuideRequest
 import com.windrr.hyundaesub.data.remote.model.LoadingGuideResponse
 import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
+import com.windrr.hyundaesub.data.remote.model.PlanFromResultRequest
+import com.windrr.hyundaesub.data.remote.model.PlanMetadataRequest
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
 import com.windrr.hyundaesub.data.remote.model.PlanSort
@@ -41,6 +43,21 @@ class PlanRemoteRepository(private val api: ChagokApi = ApiClient.chagokApi) {
         request: PreviewRequest,
         idempotencyKey: String,
     ): ApiResult<PreviewResponse> = apiCall { api.previewCalculation(idempotencyKey, request) }
+
+    /** 미리보기 결과로 새 계획 저장. 재시도엔 같은 [idempotencyKey] */
+    suspend fun createPlanFromResult(
+        previewId: String,
+        arrangementId: String,
+        idempotencyKey: String,
+    ): ApiResult<PlanResponse> =
+        apiCall { api.createPlanFromResult(idempotencyKey, PlanFromResultRequest(previewId, arrangementId)) }
+
+    /** 계획 메타데이터 수정. 재시도엔 같은 [idempotencyKey] */
+    suspend fun updatePlanMetadata(
+        planId: String,
+        request: PlanMetadataRequest,
+        idempotencyKey: String,
+    ): ApiResult<PlanResponse> = apiCall { api.updatePlanMetadata(idempotencyKey, planId, request) }
 
     /** 배치 하나의 적재 안내. 배치마다 새 Idempotency-Key */
     suspend fun loadingGuide(

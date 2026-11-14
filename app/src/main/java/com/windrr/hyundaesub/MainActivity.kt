@@ -18,6 +18,8 @@ import com.windrr.hyundaesub.measure.ArMeasureScreen
 import com.windrr.hyundaesub.push.PushNotifier
 import com.windrr.hyundaesub.push.PushTokenSync
 import com.windrr.hyundaesub.ui.plan.PlanSaveRoute
+import com.windrr.hyundaesub.ui.plan.PlanSaveSource
+import com.windrr.hyundaesub.ui.result.PlanSavedScreen
 import com.windrr.hyundaesub.ui.recommend.RecommendInput
 import com.windrr.hyundaesub.ui.recommend.RecommendRoute
 import com.windrr.hyundaesub.ui.item.ItemSelectScreen
@@ -106,11 +108,22 @@ class MainActivity : ComponentActivity() {
                         },
                         viewModel = viewModel(key = "recommend-${state.recommendId}"),
                     )
-                    MainRoute.PLAN_SAVE -> PlanSaveRoute(
-                        onBack = { viewModel.onIntent(MainIntent.BackToRecommend) },
-                        // TODO: POST /plans {source_preview_id, selected_arrangement_id} → plan_id, 이후 이름·카테고리·메모는 PATCH metadata
-                        onSaved = { },
-                        viewModel = viewModel(key = "plan-save-${state.recommendId}"),
+                    MainRoute.PLAN_SAVE -> {
+                        val previewId = state.confirmedPreviewId
+                        val arrangementId = state.confirmedArrangementId
+                        if (previewId != null && arrangementId != null) {
+                            PlanSaveRoute(
+                                source = PlanSaveSource(previewId, arrangementId),
+                                onBack = { viewModel.onIntent(MainIntent.BackToRecommend) },
+                                onSaved = { viewModel.onIntent(MainIntent.PlanSaved(it)) },
+                                // 다른 배치를 고르면 새 저장 화면(새 Idempotency-Key)
+                                viewModel = viewModel(key = "plan-save-$previewId-$arrangementId"),
+                            )
+                        }
+                    }
+                    MainRoute.PLAN_SAVED -> PlanSavedScreen(
+                        onNewPlan = { viewModel.onIntent(MainIntent.StartLoadFlow) },
+                        onGoHome = { viewModel.onIntent(MainIntent.GoHomeAfterSave) },
                     )
                     MainRoute.LAYOUT_FAILED -> LayoutFailedScreen(
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },

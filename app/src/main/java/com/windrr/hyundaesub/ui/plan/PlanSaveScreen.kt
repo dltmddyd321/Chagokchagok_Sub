@@ -1,5 +1,6 @@
 package com.windrr.hyundaesub.ui.plan
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -49,24 +51,29 @@ import com.windrr.hyundaesub.ui.theme.ChagokTextSecondary
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 
 /**
- * 짐 등록 흐름 마지막: 계획 이름·카테고리·메모를 정하고 저장.
- * 저장하면 [onSaved]로 입력값을 넘긴다 (짐·좌석·차량과 합쳐 DB 저장은 상위 흐름 담당).
+ * 짐 등록 흐름 마지막: 계획 이름·카테고리·메모를 정하고 서버에 저장.
+ * 배치 추천에서 고른 [source](미리보기 + 배치)로 계획을 만들고, 저장되면 [onSaved]로 plan_id를 넘긴다.
  */
 @Composable
 fun PlanSaveRoute(
+    source: PlanSaveSource,
     onBack: () -> Unit,
-    onSaved: (PlanMeta) -> Unit,
+    onSaved: (planId: String) -> Unit,
     viewModel: PlanSaveViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) { viewModel.start(source) }
     LaunchedEffect(viewModel) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is PlanSaveEffect.Saved -> onSaved(effect.meta)
+                is PlanSaveEffect.Saved -> onSaved(effect.planId)
+                is PlanSaveEffect.Failed -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
             }
         }
     }
-    BackHandler(onBack = onBack)
+    // 저장 중에는 뒤로가지 않는다 (저장 결과를 놓치지 않게)
+    BackHandler { if (!state.isSaving) onBack() }
 
     PlanSaveScreen(state = state, onIntent = viewModel::onIntent, onBack = onBack)
 }
@@ -142,7 +149,7 @@ fun PlanSaveScreen(
         }
 
         ChagokPrimaryButton(
-            text = "계획 저장하기",
+            text = if (state.isSaving) "저장하는 중…" else "계획 저장하기",
             onClick = { onIntent(PlanSaveIntent.Save) },
             enabled = state.canSave,
             modifier = Modifier.padding(horizontal = 20.dp),

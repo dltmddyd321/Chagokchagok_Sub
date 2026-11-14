@@ -47,6 +47,9 @@ enum class MainRoute {
     /** 배치 확인 후 계획 이름·카테고리·메모 입력 */
     PLAN_SAVE,
 
+    /** 계획 저장 완료 */
+    PLAN_SAVED,
+
     /** 배치 추천 결과 없음 */
     LAYOUT_FAILED,
 
@@ -95,6 +98,8 @@ data class MainUiState(
     /** 추천 화면에서 확인한 미리보기·배치. 계획 저장 때 POST /plans(source_preview_id, selected_arrangement_id) */
     val confirmedPreviewId: String? = null,
     val confirmedArrangementId: String? = null,
+    /** 계획을 저장할 때마다 증가 — 홈이 서버 목록을 다시 불러오는 신호 */
+    val homeRefreshKey: Int = 0,
 )
 
 sealed interface MainIntent {
@@ -194,6 +199,12 @@ sealed interface MainIntent {
 
     /** 계획 저장에서 뒤로 → 추천 화면 */
     data object BackToRecommend : MainIntent
+
+    /** 서버 저장 완료 → 저장 완료 화면 (홈 목록 갱신 예약) */
+    data class PlanSaved(val planId: String) : MainIntent
+
+    /** 저장 완료 > 홈으로 가기 */
+    data object GoHomeAfterSave : MainIntent
 
     /** 전체 화면에서 뒤로 → 탭 화면 */
     data object BackToTabs : MainIntent

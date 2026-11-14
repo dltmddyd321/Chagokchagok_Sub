@@ -38,6 +38,9 @@ data class HomeUiState(
 
 sealed interface HomeIntent {
     data class ToggleFavorite(val planId: String) : HomeIntent
+
+    /** 서버 계획 목록 다시 불러오기 (계획 저장 후) */
+    data object Refresh : HomeIntent
 }
 
 internal object PlanCardMapper {

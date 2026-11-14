@@ -78,6 +78,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onIntent(intent: HomeIntent) {
         when (intent) {
+            HomeIntent.Refresh -> refreshFromServer()
             // TODO: 서버 목록일 때는 PATCH /plans/{id}/metadata (expected_revision 필요)로 바꾸기
             is HomeIntent.ToggleFavorite -> if (!showingServer) viewModelScope.launch {
                 val current = _state.value.recentPlans.firstOrNull { it.planId == intent.planId } ?: return@launch

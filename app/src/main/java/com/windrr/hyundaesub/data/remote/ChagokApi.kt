@@ -5,6 +5,8 @@ import com.windrr.hyundaesub.data.remote.model.CalculationResponse
 import com.windrr.hyundaesub.data.remote.model.DeviceRegistrationRequest
 import com.windrr.hyundaesub.data.remote.model.DeviceResponse
 import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
+import com.windrr.hyundaesub.data.remote.model.PlanFromResultRequest
+import com.windrr.hyundaesub.data.remote.model.PlanMetadataRequest
 import com.windrr.hyundaesub.data.remote.model.LoadingGuideRequest
 import com.windrr.hyundaesub.data.remote.model.LoadingGuideResponse
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
@@ -17,6 +19,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -28,6 +31,21 @@ interface ChagokApi {
     suspend fun createPlan(
         @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
         @Body request: PlanCreateRequest,
+    ): Response<ApiResponse<PlanResponse>>
+
+    /** 새 계획 저장: 미리보기에서 고른 배치로 만든다. 응답에 plan_id, revision */
+    @POST("api/v1/plans")
+    suspend fun createPlanFromResult(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Body request: PlanFromResultRequest,
+    ): Response<ApiResponse<PlanResponse>>
+
+    /** 계획 이름·카테고리·메모·즐겨찾기 수정 (expected_revision 낙관적 잠금) */
+    @PATCH("api/v1/plans/{plan_id}/metadata")
+    suspend fun updatePlanMetadata(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Path("plan_id") planId: String,
+        @Body request: PlanMetadataRequest,
     ): Response<ApiResponse<PlanResponse>>
 
     @POST("api/v1/plans/{plan_id}/calculations")

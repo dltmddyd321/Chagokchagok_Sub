@@ -38,7 +38,7 @@ fun MainScreen(
                 .hazeSource(state = hazeState),
         ) {
             when (state.selectedTab) {
-                MainTab.HOME -> HomeScreen(onIntent = onIntent)
+                MainTab.HOME -> HomeScreen(onIntent = onIntent, refreshKey = state.homeRefreshKey)
                 MainTab.PLAN -> TabPlaceholder("계획 탭 (준비 중)")
                 MainTab.MY_ITEMS -> TabPlaceholder("내 짐 탭 (준비 중)")
                 MainTab.MY -> TabPlaceholder("마이 탭 (준비 중)")

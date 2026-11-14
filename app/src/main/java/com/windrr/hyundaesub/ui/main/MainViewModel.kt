@@ -127,6 +127,18 @@ class MainViewModel : ViewModel() {
                 )
             }
             MainIntent.BackToRecommend -> _state.update { it.copy(route = MainRoute.RECOMMEND) }
+            is MainIntent.PlanSaved -> _state.update {
+                it.copy(
+                    route = MainRoute.PLAN_SAVED,
+                    confirmedPreviewId = null,
+                    confirmedArrangementId = null,
+                    // 홈(탭 화면)은 저장 흐름 뒤에 그대로 있으므로 여기서 갱신 신호를 올린다
+                    homeRefreshKey = it.homeRefreshKey + 1,
+                )
+            }
+            MainIntent.GoHomeAfterSave -> _state.update {
+                it.copy(route = MainRoute.TABS, selectedTab = MainTab.HOME, pickedItems = emptyList(), occupiedSeats = emptySet())
+            }
             MainIntent.BackToTabs -> _state.update { it.copy(route = MainRoute.TABS) }
             MainIntent.OpenFrequentItems -> _state.update { it.copy(selectedTab = MainTab.MY_ITEMS) }
         }

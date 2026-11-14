@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,9 +60,14 @@ private val BottomBarClearance = 100.dp
 @Composable
 fun HomeScreen(
     onIntent: (MainIntent) -> Unit,
+    /** 계획 저장 등으로 바뀌면 서버 목록을 다시 불러온다 (0 = 처음 진입, ViewModel이 알아서 불러옴) */
+    refreshKey: Int = 0,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(refreshKey) {
+        if (refreshKey > 0) viewModel.onIntent(HomeIntent.Refresh)
+    }
     when {
         state.isLoading -> Unit // DB 첫 조회는 순식간이라 빈 화면으로 둔다
         state.hasPlans -> HomePlansContent(

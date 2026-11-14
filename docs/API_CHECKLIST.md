@@ -41,11 +41,11 @@
 ### 적재 계획
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/plans` | 🟡 | 🟡 | 계획 저장 화면 "계획 저장하기" (미연결). 새 계획은 `source_preview_id` + `selected_arrangement_id`로 저장 (앱 모델에 아직 없음) |
+| `POST /api/v1/plans` | 🔌 | 🟡 | 서브앱 계획 저장 화면 "계획 저장하기": `{source_preview_id, selected_arrangement_id}`로 생성 → plan_id·revision. (짐 직접 보내는 PlanCreate는 등록만) |
 | `GET /api/v1/plans` | ✅ | 🔌 | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 앱 시작 시 `PlanSyncRepository`가 최근 20개를 기기 DB로 동기화한 뒤 도착 감지 시작 |
 | `GET /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
 | `PUT /api/v1/plans/{plan_id}` | ⬜ | ⬜ | 계획 전체 변경 (`expected_revision`) |
-| `PATCH /api/v1/plans/{plan_id}/metadata` | ⬜ | ⬜ | 서브앱 홈 즐겨찾기 별 (지금 서버 목록일 땐 동작 안 함) |
+| `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision). 홈 즐겨찾기 별은 아직 미연결 |
 | `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | ⬜ | 사용할 배치안 선택 |
 
 ### 적재 계산
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 3 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
-| 🟡 등록만 | 3 (`POST /plans`, `POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 14 | 12 |
+| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
+| 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
+| ⬜ 남음 | 13 | 12 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: 서브앱 계획 저장 연결 (`POST /plans` 미리보기 결과로 생성 → `PATCH metadata`), 저장 완료 후 홈 서버 목록 갱신.
 - 2026-11-14: 서브앱 적재 안내 `POST /ai/loading-guides` 연결 (가이드 대기·가이드 화면).
 - 2026-11-14: 서브앱 배치 추천 화면에 `POST /calculations/preview` 연결 (추천 1~3 탭, load_order 순 페이드인).
 - 2026-11-14: Pleos 앱 시작 시 동기화 → 도착 감지 순서로 변경.
