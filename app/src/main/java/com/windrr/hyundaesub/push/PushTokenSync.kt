@@ -3,16 +3,20 @@ package com.windrr.hyundaesub.push
 import android.content.Context
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
+import com.windrr.hyundaesub.data.remote.ApiResult
+import com.windrr.hyundaesub.data.remote.NotificationRemoteRepository
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 /**
- * FCM 토큰 받아오기 + 서버 등록.
+ * FCM 토큰 받아오기 + 서버 등록(PUT /notifications/devices/{device_id}).
  * 앱 시작 시 [refresh], 토큰이 새로 발급되면 [onNewToken]을 부른다.
  */
 object PushTokenSync {
 
     private const val TAG = "PushTokenSync"
+
+    private val remote by lazy { NotificationRemoteRepository() }
 
     /** 현재 토큰을 받아 저장하고, 아직 서버에 안 올렸으면 등록한다 */
     suspend fun refresh(context: Context) {
@@ -24,7 +28,21 @@ object PushTokenSync {
         val store = PushTokenStore(context)
         store.save(token)
         if (store.isSynced) return
-        if (uploadToServer(token)) store.markSynced()
+        when (val result = remote.registerDevice(store.deviceId, token)) {
+            is ApiResult.Success -> {
+                store.markSynced()
+                Log.d(TAG, "FCM 토큰 서버 등록 완료 (active=${result.data.active})")
+            }
+            else -> Log.w(TAG, "FCM 토큰 서버 등록 실패 → 다음 실행 때 재시도: $result")
+        }
+    }
+
+    /** 푸시를 끌 때(예: 알림 설정 해제) 서버에서 이 기기를 뺀다 */
+    suspend fun unregister(context: Context): Boolean {
+        val store = PushTokenStore(context)
+        val result = remote.unregisterDevice(store.deviceId)
+        if (result is ApiResult.Success) store.markUnsynced() else Log.w(TAG, "FCM 토큰 서버 해제 실패: $result")
+        return result is ApiResult.Success
     }
 
     private suspend fun fetchToken(): String? = suspendCancellableCoroutine { cont ->
@@ -36,15 +54,5 @@ object PushTokenSync {
                 cont.resume(null)
             }
         }
-    }
-
-    /**
-     * TODO: 백엔드 알림 기기 등록 API가 정해지면 연결.
-     * 지금은 로그만 남기고 false를 돌려줘 다음 실행 때 다시 시도하게 둔다.
-     */
-    @Suppress("RedundantSuspendModifier")
-    private suspend fun uploadToServer(token: String): Boolean {
-        Log.d(TAG, "FCM 토큰 준비됨 (서버 등록 API 연결 전): ${token.take(12)}…")
-        return false
     }
 }

@@ -18,9 +18,10 @@
 
 | 항목 | 서브앱 | Pleos 앱 |
 |---|---|---|
-| Base URL (`https://chagokchagok-api.duckdns.org`, 끝 `/` 자동 처리) | ✅ | ⬜ 기본값 `http://localhost/` |
-| Basic 인증 (`local.properties`: `CHAGOK_API_USERNAME` / `CHAGOK_API_PASSWORD`) | ✅ | ⬜ |
-| 로그에서 Authorization 가림 | ✅ | ⬜ |
+| Base URL (`https://chagokchagok-api.duckdns.org`, 끝 `/` 자동 처리) | ✅ | 🔌 서브앱과 같게 맞춤 (실호출 미확인) |
+| Basic 인증 (`local.properties`: `CHAGOK_API_USERNAME` / `CHAGOK_API_PASSWORD`) | ✅ | 🔌 |
+| 로그에서 Authorization 가림 | ✅ | ✅ |
+| `X-Notification-Key` 헤더 (알림 API, `local.properties`: `CHAGOK_NOTIFICATION_KEY`, 비면 생략) | 🔌 | 🔌 |
 | `Idempotency-Key` 헤더 (POST/PUT/PATCH) | ✅ 등록된 API만 | ✅ 등록된 API만 |
 
 ## API 목록 (Swagger 기준 22개)
@@ -75,18 +76,20 @@
 ### 알림
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `PUT /api/v1/notifications/devices/{device_id}` | ⬜ | ➖ | 폰 FCM 토큰 등록 |
-| `DELETE /api/v1/notifications/devices/{device_id}` | ⬜ | ➖ | |
-| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | ⬜ | Pleos 도착·문 열림 시 폰으로 짐 챙기기 알림 (지금은 차량 알림만) |
+| `PUT /api/v1/notifications/devices/{device_id}` | 🔌 | ➖ | 앱 시작·토큰 갱신 시 `PushTokenSync`가 등록. device_id는 앱이 만든 UUID. 실호출 테스트 `NotificationApiLiveTest` 작성(미실행) |
+| `DELETE /api/v1/notifications/devices/{device_id}` | 🟡 | ➖ | `PushTokenSync.unregister()` 준비. 알림 끄기 화면 생기면 연결 |
+| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | 🔌 | `ArrivalReminderService`: 도착+P단이면 `DESTINATION_ARRIVED`, 문 열림이면 `DOOR_OPENED`. 차량 알림과 같이 보냄. 실호출 테스트 `CargoReminderApiLiveTest` 작성(미실행) |
 
 ## 요약
 
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🟡 등록만 | 2 (`POST /plans`, `POST /plans/{id}/calculations`) | 2 (같음) |
-| ⬜ 남음 | 18 | 15 |
+| 🔌 연결만 | 1 (`PUT /notifications/devices`) | 1 (`POST /cargo-reminders`) |
+| 🟡 등록만 | 3 (`POST /plans`, `POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
+| ⬜ 남음 | 16 | 14 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: 모바일 알림 3개 등록. 서브앱 기기 등록(토큰 동기화 연결)·해제, Pleos 짐 챙기기 알림(도착 서비스 연결). Pleos Base URL·Basic 인증 서브앱과 맞춤.
 - 2026-11-14: 체크리스트 작성. 서브앱 `GET /plans` 연결·실호출 200, Basic 인증·Base URL 정리.

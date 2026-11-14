@@ -32,6 +32,8 @@ android {
         // 서버 Basic 인증 계정: 공개 레포라 반드시 local.properties에만 (커밋 금지)
         buildConfigField("String", "CHAGOK_API_USERNAME", "\"${localProperty("CHAGOK_API_USERNAME")}\"")
         buildConfigField("String", "CHAGOK_API_PASSWORD", "\"${localProperty("CHAGOK_API_PASSWORD")}\"")
+        // 알림 API 선택 헤더 X-Notification-Key (없으면 빈 값 → 헤더 생략)
+        buildConfigField("String", "CHAGOK_NOTIFICATION_KEY", "\"${localProperty("CHAGOK_NOTIFICATION_KEY")}\"")
     }
 
     buildTypes {

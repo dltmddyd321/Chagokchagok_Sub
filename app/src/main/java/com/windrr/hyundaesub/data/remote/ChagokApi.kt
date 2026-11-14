@@ -2,15 +2,19 @@ package com.windrr.hyundaesub.data.remote
 
 import com.windrr.hyundaesub.data.remote.model.CalculationRequest
 import com.windrr.hyundaesub.data.remote.model.CalculationResponse
+import com.windrr.hyundaesub.data.remote.model.DeviceRegistrationRequest
+import com.windrr.hyundaesub.data.remote.model.DeviceResponse
 import com.windrr.hyundaesub.data.remote.model.PlanCreateRequest
 import com.windrr.hyundaesub.data.remote.model.PlanListResponse
 import com.windrr.hyundaesub.data.remote.model.PlanResponse
 import com.windrr.hyundaesub.data.remote.model.PlanSort
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -43,7 +47,25 @@ interface ChagokApi {
         @Query("favorite") favorite: Boolean? = null,
     ): Response<ApiResponse<PlanListResponse>>
 
+    /** 폰 FCM 토큰 등록·갱신. device_id는 앱이 만든 UUID (같은 기기면 계속 같은 값) */
+    @PUT("api/v1/notifications/devices/{device_id}")
+    suspend fun registerDevice(
+        @Path("device_id") deviceId: String,
+        @Header(NOTIFICATION_KEY_HEADER) notificationKey: String?,
+        @Body request: DeviceRegistrationRequest,
+    ): Response<ApiResponse<DeviceResponse>>
+
+    /** 폰 FCM 토큰 해제 */
+    @DELETE("api/v1/notifications/devices/{device_id}")
+    suspend fun unregisterDevice(
+        @Path("device_id") deviceId: String,
+        @Header(NOTIFICATION_KEY_HEADER) notificationKey: String?,
+    ): Response<ApiResponse<DeviceResponse>>
+
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+
+        /** 알림 API 선택 헤더. 값이 null이면 Retrofit이 헤더를 빼고 보낸다 */
+        const val NOTIFICATION_KEY_HEADER = "X-Notification-Key"
     }
 }
