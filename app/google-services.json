@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "847220170589",
+    "project_id": "chagok-2623d",
+    "storage_bucket": "chagok-2623d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:847220170589:android:38936c3f122d0781b792b4",
+        "android_client_info": {
+          "package_name": "com.windrr.hyundaesub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBi1k_EDwR-VeK7B6PsiR8kz2WDcMuvxPg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
