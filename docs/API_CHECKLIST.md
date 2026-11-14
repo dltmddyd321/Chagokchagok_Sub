@@ -53,7 +53,7 @@
 |---|---|---|---|
 | `POST /api/v1/plans/{plan_id}/calculations` | 🟡 | 🟡 | **이미 저장된 계획**을 다시 계산할 때만. 새 계획은 `calculations/preview` → `POST /plans`. 모델이 옛 형식 |
 | `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | ⬜ | |
-| `POST /api/v1/calculations/preview` | 🔌 | ⬜ | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" 후보 |
+| `POST /api/v1/calculations/preview` | 🔌 | 🔌 | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" → 적재 결과 화면: 인원 수만 보내고 `passenger_seats` 생략(서버가 자리 지정), 전 좌석 EMPTY로 보내야 좌석·접은 좌석 사용 (2026-11-15 curl 확인) |
 
 ### 내 짐
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 4 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`) |
+| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 5 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 13 | 11 |
+| ⬜ 남음 | 13 | 10 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: Pleos 적재 가능 여부 확인에 `POST /calculations/preview` 연결 (적재 결과 화면), 좌석 착석 센서로 동승자 기본값.
 - 2026-11-14: 서브앱 홈 즐겨찾기 별을 `PATCH metadata`로 연결.
 - 2026-11-14: Pleos 제품명 말하기에 `POST /products/search` 연결 (찾은 제품 규격 창).
 - 2026-11-14: Pleos 계획 동기화를 최신 1개로 변경 (주행 중 서비스), 홈 최신 계획 카드.
