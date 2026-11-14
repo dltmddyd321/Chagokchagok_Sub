@@ -26,7 +26,11 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "CHAGOK_API_BASE_URL", "\"${localProperty("CHAGOK_API_BASE_URL").ifBlank { "http://localhost/" }}\"")
+        // 서버 주소: local.properties에 없으면 팀 개발 서버 (끝 '/'는 있어도 없어도 됨 — ApiClient가 맞춤)
+        buildConfigField("String", "CHAGOK_API_BASE_URL", "\"${localProperty("CHAGOK_API_BASE_URL").ifBlank { "https://chagokchagok-api.duckdns.org" }}\"")
+        // 서버 Basic 인증 계정: 공개 레포라 반드시 local.properties에만 (커밋 금지)
+        buildConfigField("String", "CHAGOK_API_USERNAME", "\"${localProperty("CHAGOK_API_USERNAME")}\"")
+        buildConfigField("String", "CHAGOK_API_PASSWORD", "\"${localProperty("CHAGOK_API_PASSWORD")}\"")
     }
 
     buildTypes {
