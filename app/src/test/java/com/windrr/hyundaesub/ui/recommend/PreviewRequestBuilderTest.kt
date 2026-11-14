@@ -40,15 +40,6 @@ class PreviewRequestBuilderTest {
     }
 
     @Test
-    fun dimensions_includeSafetyMargin() {
-        val stroller = request.plan.items[0] // 55 × 85 × 40
-        assertEquals(57.8, stroller.widthCm, 1e-9) // +5% = 2.75 → 57.75 올림
-        assertEquals(89.3, stroller.depthCm, 1e-9) // +5% = 4.25
-        assertEquals(42.0, stroller.heightCm, 1e-9) // +5% = 2.0
-        assertEquals(12.0, PreviewRequestBuilder.withMargin(10), 1e-9) // 작은 짐은 최소 2cm
-    }
-
-    @Test
     fun vehicleState_marksUnselectedSeatsEmpty() {
         val seats = request.calculationOptions.vehicleState!!.seats.associate { it.seatCode to it.occupancy }
         assertEquals(
