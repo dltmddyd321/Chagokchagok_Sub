@@ -26,7 +26,8 @@ class PreviewApiLiveTest {
             localVehicleId = "avante_cn8",
             occupiedSeats = emptySet(),
             items = listOf(
-                PickedItem(key = "a", name = "큰박스", widthCm = 90, depthCm = 100, heightCm = 40),
+                // 여유분 포함 92.4 × 105 × 40 (트렁크 입구 높이 41.5 이하)
+                PickedItem(key = "a", name = "큰박스", widthCm = 88, depthCm = 100, heightCm = 38),
                 PickedItem(key = "b", name = "긴박스", widthCm = 55, depthCm = 55, heightCm = 40),
             ),
         )

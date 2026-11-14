@@ -58,11 +58,24 @@ internal object PreviewRequestBuilder {
         )
     }
 
+    /**
+     * 계산용 여유분: 치수마다 [MARGIN_RATIO]와 [MARGIN_MIN_CM] 중 큰 값을 더한다.
+     * 측정 오차(AR)·포장 부피 때문에 실제로는 안 들어가는 배치를 추천하지 않도록, 빡빡한 배치보다 여유 있는 배치만 고르게 한다.
+     */
+    fun withMargin(cm: Int): Double {
+        val margin = maxOf(cm * MARGIN_RATIO, MARGIN_MIN_CM)
+        // 서버는 0.1cm 단위(multipleOf 0.1) → 올림
+        return kotlin.math.ceil((cm + margin) * 10 - 1e-9) / 10
+    }
+
+    const val MARGIN_RATIO = 0.05
+    const val MARGIN_MIN_CM = 2.0
+
     private fun toItemInput(item: PickedItem) = PreviewItemInput(
         name = item.name.ifBlank { "짐" },
-        widthCm = item.widthCm.toDouble(),
-        depthCm = item.depthCm.toDouble(),
-        heightCm = item.heightCm.toDouble(),
+        widthCm = withMargin(item.widthCm),
+        depthCm = withMargin(item.depthCm),
+        heightCm = withMargin(item.heightCm),
         quantity = item.quantity,
         requiredQuantity = if (item.required) item.quantity else 0,
         // 등록된 물건에서 불러온 것만 출처를 안다. 나머지(AR·직접 입력 구분 없음)는 기본값
