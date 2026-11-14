@@ -71,7 +71,7 @@
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
 | `POST /api/v1/ai/messages` | ⬜ | ⬜ | |
-| `POST /api/v1/ai/loading-guides` | 🔌 | ⬜ | 서브앱 배치 추천: 배치안이 나오면 곧장 배치안마다 `{preview_id, arrangement_id}`로 요청 → "가이드 보기" 화면. 2026-11-14 curl 확인: 지금은 `source=FALLBACK`, `steps` 빈 배열 → 앱이 싣는 순서로 기본 문구 생성 |
+| `POST /api/v1/ai/loading-guides` | 🔌 | 🔌 | 서브앱 배치 추천: 배치안이 나오면 곧장 배치안마다 `{preview_id, arrangement_id}`로 요청 → "가이드 보기" 화면. 2026-11-14 curl 확인: 지금은 `source=FALLBACK`, `steps` 빈 배열 → 앱이 싣는 순서로 기본 문구 생성 / Pleos: 적재 가능이면 결과가 나오자마자 배치안마다 미리 받아 두고 "이 조건으로 진행" → 적재 가이드 화면 |
 
 ### 알림
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 5 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`) |
+| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 6 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 13 | 10 |
+| ⬜ 남음 | 13 | 9 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: Pleos 적재 가이드 `POST /ai/loading-guides` 연결 (적재 가능 시 미리 받기, 이 조건으로 진행 → 가이드 화면).
 - 2026-11-15: Pleos 적재 가능 여부 확인에 `POST /calculations/preview` 연결 (적재 결과 화면), 좌석 착석 센서로 동승자 기본값.
 - 2026-11-14: 서브앱 홈 즐겨찾기 별을 `PATCH metadata`로 연결.
 - 2026-11-14: Pleos 제품명 말하기에 `POST /products/search` 연결 (찾은 제품 규격 창).
