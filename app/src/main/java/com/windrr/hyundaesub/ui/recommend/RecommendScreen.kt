@@ -289,7 +289,7 @@ private fun StatusCard(content: @Composable () -> Unit) {
 /**
  * 탑뷰 이미지 위에 좌석 표시칸과 짐 사각형을 올린다.
  * - 배치 화면([guideSteps] 없음): 접는 좌석은 칸을 지우고, 짐은 싣는 순서(load_order)대로 하나씩 페이드인. 탭을 바꾸면 처음부터 다시.
- * - 가이드 화면([guideSteps] 있음): 접을 자리를 점선 칸으로 표시하고, 단계 번호 배지를 붙인다. 애니메이션 없음.
+ * - 가이드 화면([guideSteps] 있음): 접을 자리를 점선 칸으로 표시한다. 애니메이션 없음 (시안: 번호 배지 없음).
  */
 @Composable
 internal fun ArrangementView(
@@ -299,8 +299,6 @@ internal fun ArrangementView(
     onOpenGuide: (() -> Unit)? = null,
 ) {
     val isGuide = guideSteps != null
-    val itemBadges = guideSteps.orEmpty().mapNotNull { step -> step.placementId?.let { it to step.number } }.toMap()
-    val foldBadges = guideSteps.orEmpty().mapNotNull { step -> step.foldedGroup?.let { it to step.number } }
     val image = ImageBitmap.imageResource(R.drawable.img_vehicle_avante_top_view_applied)
     BoxWithConstraints(
         modifier = Modifier
@@ -354,13 +352,6 @@ internal fun ArrangementView(
                 }
             }
         }
-        // 단계 번호 배지: 칸의 왼쪽 위 모서리
-        foldBadges.forEach { (group, number) ->
-            group.markRects.firstOrNull()?.let { StepBadge(number = number, rect = it, scale = scale) }
-        }
-        layout.items.forEach { item ->
-            itemBadges[item.placementId]?.let { StepBadge(number = it, rect = item.rect, scale = scale) }
-        }
         onOpenGuide?.let { open ->
             Box(
                 modifier = Modifier
@@ -374,27 +365,6 @@ internal fun ArrangementView(
                 Text(text = "가이드 보기", color = ChagokTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
-    }
-}
-
-/** 이미지 위 단계 번호 (흰 테두리 남색 원) */
-@Composable
-private fun StepBadge(number: Int, rect: PxRect, scale: Dp) {
-    Box(
-        modifier = Modifier
-            .offset(
-                x = scale * (rect.left - AvanteTopView.CROP_LEFT) - BADGE_SIZE / 3,
-                y = scale * (rect.top - AvanteTopView.CROP_TOP) - BADGE_SIZE / 3,
-            )
-            .size(BADGE_SIZE)
-            .clip(CircleShape)
-            .background(Color.White)
-            .padding(1.5.dp)
-            .clip(CircleShape)
-            .background(TabSelectedBg),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = "$number", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -443,7 +413,6 @@ private const val ITEM_FADE_MS = 400
 
 /** 아주 작은 짐도 보이도록 최소 크기 */
 private val MIN_BOX = 14.dp
-private val BADGE_SIZE = 16.dp
 private val FoldedMarkFill = Color(0x99202833)
 private val GuidePillBg = Color(0xF2EEF1F6)
 
