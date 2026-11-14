@@ -2,7 +2,7 @@ package com.windrr.hyundaesub.ui.seat
 
 import com.windrr.hyundaesub.data.local.entity.SeatCode
 
-/** 아반떼(5인승) 좌석 배치. 운전석은 항상 탑승이라 선택 대상이 아니다 */
+/** 투싼(5인승) 좌석 배치 (아반떼와 같은 5좌석). 운전석은 항상 탑승이라 선택 대상이 아니다 */
 object AvanteSeats {
     val DRIVER = SeatCode.ROW_1_LEFT
     val SELECTABLE = listOf(

@@ -202,8 +202,8 @@ private fun BackOnlyTopBar(onBack: () -> Unit) {
 }
 
 /**
- * 아반떼 실내 탑뷰 이미지 위에 좌석 버튼을 올린다.
- * 이미지(1255×1673px)에서 좌석 부분만 잘라 화면 폭에 맞추고, 좌석 중심 좌표(원본 px)를 같은 비율로 옮긴다.
+ * 투싼 실내 탑뷰 이미지 위에 좌석 버튼을 올린다.
+ * 이미지(976×1612px, drawable-nodpi)에서 좌석 부분만 잘라 화면 폭에 맞추고, 좌석 중심 좌표(원본 px)를 같은 비율로 옮긴다.
  * 운전석은 항상 탑승이라 버튼을 두지 않는다.
  */
 @Composable
@@ -211,7 +211,7 @@ private fun CarTopView(
     selectedSeats: Set<SeatCode>,
     onSeatClick: (SeatCode) -> Unit,
 ) {
-    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_avante_top_view_applied)
+    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_tucson_top_view)
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,20 +245,20 @@ private fun CarTopView(
 }
 
 /** 탑뷰 이미지에서 보여줄 영역 (원본 px): 대시보드 아래 ~ 트렁크 앞 */
-private const val CROP_LEFT = 150
-private const val CROP_TOP = 430
-private const val CROP_W = 955
-private const val CROP_H = 822 // 360dp 폭에서 약 310dp (시안 비율)
+private const val CROP_LEFT = 40
+private const val CROP_TOP = 470
+private const val CROP_W = 896
+private const val CROP_H = 771 // 360dp 폭에서 약 310dp (시안 비율)
 
 /** 좌석 버튼 크기 (원본 px) */
 private const val SLOT_PX = 150f
 
 /** 좌석 쿠션 중심 (원본 px) */
 private val SEAT_CENTERS_PX = listOf(
-    SeatCode.ROW_1_RIGHT to (813f to 705f),
-    SeatCode.ROW_2_LEFT to (440f to 1070f),
-    SeatCode.ROW_2_CENTER to (630f to 1070f),
-    SeatCode.ROW_2_RIGHT to (817f to 1070f),
+    SeatCode.ROW_1_RIGHT to (668f to 625f),
+    SeatCode.ROW_2_LEFT to (305f to 990f),
+    SeatCode.ROW_2_CENTER to (492f to 990f),
+    SeatCode.ROW_2_RIGHT to (680f to 990f),
 )
 
 private val PrevButtonBg = Color(0xFFDDE3EE)

@@ -275,7 +275,7 @@ private fun StatusCard(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(AvanteTopView.CROP_W.toFloat() / AvanteTopView.CROP_H)
+            .aspectRatio(VehicleTopView.CROP_W.toFloat() / VehicleTopView.CROP_H)
             .clip(CardShape)
             .background(Brush.horizontalGradient(listOf(CardBgEdge, CardBgCenter, CardBgEdge)))
             .padding(24.dp),
@@ -299,24 +299,24 @@ internal fun ArrangementView(
     onOpenGuide: (() -> Unit)? = null,
 ) {
     val isGuide = guideSteps != null
-    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_avante_top_view_applied)
+    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_tucson_top_view)
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(AvanteTopView.CROP_W.toFloat() / AvanteTopView.CROP_H)
+            .aspectRatio(VehicleTopView.CROP_W.toFloat() / VehicleTopView.CROP_H)
             .clip(CardShape)
             .background(Brush.horizontalGradient(listOf(CardBgEdge, CardBgCenter, CardBgEdge)))
             .drawBehind {
                 drawImage(
                     image = image,
-                    srcOffset = IntOffset(AvanteTopView.CROP_LEFT, AvanteTopView.CROP_TOP),
-                    srcSize = IntSize(AvanteTopView.CROP_W, AvanteTopView.CROP_H),
+                    srcOffset = IntOffset(VehicleTopView.CROP_LEFT, VehicleTopView.CROP_TOP),
+                    srcSize = IntSize(VehicleTopView.CROP_W, VehicleTopView.CROP_H),
                     dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
                     filterQuality = FilterQuality.High,
                 )
             },
     ) {
-        val scale = maxWidth / AvanteTopView.CROP_W.toFloat() // dp per 원본 px
+        val scale = maxWidth / VehicleTopView.CROP_W.toFloat() // dp per 원본 px
         layout.seats.forEach { seat ->
             OverlayBox(
                 rect = seat.rect,
@@ -375,7 +375,7 @@ private fun OverlayBox(rect: PxRect, scale: Dp, fill: Color, label: String, modi
     val height = (scale * rect.height).coerceAtLeast(MIN_BOX)
     Box(
         modifier = modifier
-            .offset(x = scale * (rect.left - AvanteTopView.CROP_LEFT), y = scale * (rect.top - AvanteTopView.CROP_TOP))
+            .offset(x = scale * (rect.left - VehicleTopView.CROP_LEFT), y = scale * (rect.top - VehicleTopView.CROP_TOP))
             .size(width, height)
             .clip(BoxShape)
             .background(fill)
@@ -439,10 +439,10 @@ private fun RecommendScreenPreview() {
                     ArrangementLayoutUi(
                         arrangementId = "a$index",
                         seats = listOf(
-                            SeatBox(SeatCode.ROW_1_RIGHT, SeatMark.BOARDING, AvanteTopView.seatMarkRect(SeatCode.ROW_1_RIGHT)),
-                            SeatBox(SeatCode.ROW_2_LEFT, SeatMark.BOARDING, AvanteTopView.seatMarkRect(SeatCode.ROW_2_LEFT)),
-                            SeatBox(SeatCode.ROW_2_CENTER, SeatMark.EMPTY_SEAT, AvanteTopView.seatMarkRect(SeatCode.ROW_2_CENTER)),
-                            SeatBox(SeatCode.ROW_2_RIGHT, SeatMark.BOARDING, AvanteTopView.seatMarkRect(SeatCode.ROW_2_RIGHT)),
+                            SeatBox(SeatCode.ROW_1_RIGHT, SeatMark.BOARDING, VehicleTopView.seatMarkRect(SeatCode.ROW_1_RIGHT)),
+                            SeatBox(SeatCode.ROW_2_LEFT, SeatMark.BOARDING, VehicleTopView.seatMarkRect(SeatCode.ROW_2_LEFT)),
+                            SeatBox(SeatCode.ROW_2_CENTER, SeatMark.EMPTY_SEAT, VehicleTopView.seatMarkRect(SeatCode.ROW_2_CENTER)),
+                            SeatBox(SeatCode.ROW_2_RIGHT, SeatMark.BOARDING, VehicleTopView.seatMarkRect(SeatCode.ROW_2_RIGHT)),
                         ),
                         items = listOf(stroller),
                     )

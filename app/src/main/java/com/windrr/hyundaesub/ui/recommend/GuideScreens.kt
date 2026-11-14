@@ -385,9 +385,9 @@ private fun GuideScreenPreview() {
     val layout = ArrangementLayoutUi(
         arrangementId = "a1",
         seats = listOf(
-            SeatBox(SeatCode.ROW_1_RIGHT, SeatMark.BOARDING, AvanteTopView.seatMarkRect(SeatCode.ROW_1_RIGHT)),
-            SeatBox(SeatCode.ROW_2_CENTER, SeatMark.EMPTY_SEAT, AvanteTopView.seatMarkRect(SeatCode.ROW_2_CENTER)),
-            SeatBox(SeatCode.ROW_2_RIGHT, SeatMark.BOARDING, AvanteTopView.seatMarkRect(SeatCode.ROW_2_RIGHT)),
+            SeatBox(SeatCode.ROW_1_RIGHT, SeatMark.BOARDING, VehicleTopView.seatMarkRect(SeatCode.ROW_1_RIGHT)),
+            SeatBox(SeatCode.ROW_2_CENTER, SeatMark.EMPTY_SEAT, VehicleTopView.seatMarkRect(SeatCode.ROW_2_CENTER)),
+            SeatBox(SeatCode.ROW_2_RIGHT, SeatMark.BOARDING, VehicleTopView.seatMarkRect(SeatCode.ROW_2_RIGHT)),
         ),
         items = listOf(stroller, box),
         foldedGroups = listOf(folded),

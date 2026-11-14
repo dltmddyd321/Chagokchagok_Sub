@@ -65,7 +65,7 @@ class ArrangementLayoutMapperTest {
     @Test
     fun trunkItem_startsAtLeftRearCorner() {
         val rect = layout.items[0].rect
-        val trunkRect = AvanteTopView.TRUNK
+        val trunkRect = VehicleTopView.TRUNK
         assertEquals(trunkRect.left, rect.left, 0.01f)
         assertEquals(trunkRect.bottom, rect.bottom, 0.01f) // y=0(뒤) = 이미지 아래
         assertEquals(trunkRect.left + trunkRect.width * (90f / 97f), rect.right, 0.5f)

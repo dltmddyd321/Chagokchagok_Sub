@@ -36,7 +36,7 @@ data class ItemBox(
 
 /** 이 배치에서 함께 접는 좌석 묶음 (예: 뒷좌석 왼쪽+가운데) */
 data class FoldedSeatGroup(val seats: List<SeatCode>) {
-    val markRects: List<PxRect> get() = seats.map(AvanteTopView::seatMarkRect)
+    val markRects: List<PxRect> get() = seats.map(VehicleTopView::seatMarkRect)
 }
 
 data class ArrangementLayoutUi(
@@ -49,7 +49,7 @@ data class ArrangementLayoutUi(
 )
 
 /**
- * 서버 배치안 → 아반떼 탑뷰 이미지 위 사각형.
+ * 서버 배치안 → 투싼 탑뷰 이미지 위 사각형.
  *
  * 서버 공간 치수(데모 차량)는 이미지 비율과 맞지 않아 차량 전체를 한 배율로 옮기면 짐이 좌석·트렁크 그림을 벗어난다.
  * 그래서 공간(트렁크·좌석·접은 좌석)마다 이미지 위 영역을 정해 두고, 짐 위치를 그 공간 안 비율로 옮긴다.
@@ -70,10 +70,10 @@ internal object ArrangementLayoutMapper {
             .toSet()
         val seats = AvanteSeats.SELECTABLE.mapNotNull { seat ->
             when {
-                seat in passengers -> SeatBox(seat, SeatMark.BOARDING, AvanteTopView.seatMarkRect(seat))
+                seat in passengers -> SeatBox(seat, SeatMark.BOARDING, VehicleTopView.seatMarkRect(seat))
                 // 접는 좌석은 "좌석" 칸을 지우고 그 자리에 짐만 그린다
                 seat in foldedSeats -> null
-                else -> SeatBox(seat, SeatMark.EMPTY_SEAT, AvanteTopView.seatMarkRect(seat))
+                else -> SeatBox(seat, SeatMark.EMPTY_SEAT, VehicleTopView.seatMarkRect(seat))
             }
         }
 
@@ -101,9 +101,9 @@ internal object ArrangementLayoutMapper {
     fun spaceRect(space: PackingSpaceResponse): PxRect? {
         val seatCodes = space.seatCodes.orEmpty().mapNotNull(::seatOf)
         return when (space.kind) {
-            KIND_TRUNK -> AvanteTopView.TRUNK
-            KIND_SEAT -> seatCodes.map(AvanteTopView::seatCushion).reduceOrNull(PxRect::union)
-            KIND_FOLDED_SEAT -> seatCodes.map(AvanteTopView::foldedSeat).reduceOrNull(PxRect::union)
+            KIND_TRUNK -> VehicleTopView.TRUNK
+            KIND_SEAT -> seatCodes.map(VehicleTopView::seatCushion).reduceOrNull(PxRect::union)
+            KIND_FOLDED_SEAT -> seatCodes.map(VehicleTopView::foldedSeat).reduceOrNull(PxRect::union)
             else -> null
         }
     }
@@ -145,50 +145,50 @@ internal object ArrangementLayoutMapper {
 }
 
 /**
- * img_vehicle_avante_top_view_applied (1255×1673px, 위가 차 앞) 위 영역. 단위 원본 px.
+ * img_vehicle_tucson_top_view (976×1612px, drawable-nodpi, 위가 차 앞) 위 영역. 단위 원본 px.
  * 좌석 중심은 좌석 선택 화면과 같은 값.
  */
-internal object AvanteTopView {
-    const val IMAGE_W = 1255
-    const val IMAGE_H = 1673
+internal object VehicleTopView {
+    const val IMAGE_W = 976
+    const val IMAGE_H = 1612
 
-    /** 추천 화면에 보여줄 영역: 앞좌석 위 ~ 뒤 범퍼(AVANTE 글자) */
-    const val CROP_LEFT = 60
-    const val CROP_TOP = 420
-    const val CROP_W = 1135
-    const val CROP_H = 1160
+    /** 추천 화면에 보여줄 영역: 앞좌석 위 ~ 뒤 범퍼(TUCSON 글자) */
+    const val CROP_LEFT = 0
+    const val CROP_TOP = 520
+    const val CROP_W = 976
+    const val CROP_H = 998
 
     /** "탑승"/"좌석" 표시칸 크기 */
     private const val MARK_PX = 170f
 
     private val SEAT_CENTERS = mapOf(
-        SeatCode.ROW_1_LEFT to (445f to 705f),
-        SeatCode.ROW_1_RIGHT to (813f to 705f),
-        SeatCode.ROW_2_LEFT to (440f to 1070f),
-        SeatCode.ROW_2_CENTER to (630f to 1070f),
-        SeatCode.ROW_2_RIGHT to (817f to 1070f),
+        SeatCode.ROW_1_LEFT to (322f to 625f),
+        SeatCode.ROW_1_RIGHT to (668f to 625f),
+        SeatCode.ROW_2_LEFT to (305f to 990f),
+        SeatCode.ROW_2_CENTER to (492f to 990f),
+        SeatCode.ROW_2_RIGHT to (680f to 990f),
     )
 
     /** 좌석 방석 (펴진 좌석 위에 짐을 놓을 때) */
     private val CUSHIONS = mapOf(
-        SeatCode.ROW_1_LEFT to PxRect(325f, 615f, 565f, 790f),
-        SeatCode.ROW_1_RIGHT to PxRect(695f, 615f, 935f, 790f),
-        SeatCode.ROW_2_LEFT to PxRect(320f, 990f, 565f, 1150f),
-        SeatCode.ROW_2_CENTER to PxRect(575f, 990f, 685f, 1150f),
-        SeatCode.ROW_2_RIGHT to PxRect(695f, 990f, 945f, 1150f),
+        SeatCode.ROW_1_LEFT to PxRect(210f, 550f, 440f, 700f),
+        SeatCode.ROW_1_RIGHT to PxRect(560f, 550f, 790f, 700f),
+        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 425f, 1075f),
+        SeatCode.ROW_2_CENTER to PxRect(432f, 905f, 552f, 1075f),
+        SeatCode.ROW_2_RIGHT to PxRect(558f, 905f, 805f, 1075f),
     )
 
     /** 접은 좌석: 방석 + 접혀 눕는 등받이까지 */
     private val FOLDED = mapOf(
-        SeatCode.ROW_1_LEFT to PxRect(325f, 615f, 565f, 870f),
-        SeatCode.ROW_1_RIGHT to PxRect(695f, 615f, 935f, 870f),
-        SeatCode.ROW_2_LEFT to PxRect(320f, 990f, 570f, 1250f),
-        SeatCode.ROW_2_CENTER to PxRect(570f, 990f, 690f, 1250f),
-        SeatCode.ROW_2_RIGHT to PxRect(690f, 990f, 945f, 1250f),
+        SeatCode.ROW_1_LEFT to PxRect(210f, 550f, 440f, 830f),
+        SeatCode.ROW_1_RIGHT to PxRect(560f, 550f, 790f, 830f),
+        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 428f, 1150f),
+        SeatCode.ROW_2_CENTER to PxRect(428f, 905f, 555f, 1150f),
+        SeatCode.ROW_2_RIGHT to PxRect(555f, 905f, 805f, 1150f),
     )
 
     /** 트렁크 바닥 */
-    val TRUNK = PxRect(330f, 1262f, 960f, 1460f)
+    val TRUNK = PxRect(175f, 1162f, 825f, 1405f)
 
     fun seatMarkRect(seat: SeatCode): PxRect {
         val (cx, cy) = SEAT_CENTERS.getValue(seat)
