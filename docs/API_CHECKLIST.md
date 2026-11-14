@@ -65,7 +65,7 @@
 ### 제품 검색
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/products/search` | ⬜ | ⬜ | Pleos "제품명 말하기" 인식 후 호출 자리 |
+| `POST /api/v1/products/search` | ⬜ | 🔌 | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력). 외부 웹 검색+AI(DB 아님). 2026-11-14 curl: 503 `PRODUCT_SEARCH_UNAVAILABLE`(서버 검색 꺼짐) → 앱은 직접 입력 안내 |
 
 ### AI
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
+| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 4 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 13 | 12 |
+| ⬜ 남음 | 13 | 11 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: Pleos 제품명 말하기에 `POST /products/search` 연결 (찾은 제품 규격 창).
 - 2026-11-14: Pleos 계획 동기화를 최신 1개로 변경 (주행 중 서비스), 홈 최신 계획 카드.
 - 2026-11-14: 서브앱 계획 저장 연결 (`POST /plans` 미리보기 결과로 생성 → `PATCH metadata`), 저장 완료 후 홈 서버 목록 갱신.
 - 2026-11-14: 서브앱 적재 안내 `POST /ai/loading-guides` 연결 (가이드 대기·가이드 화면).
