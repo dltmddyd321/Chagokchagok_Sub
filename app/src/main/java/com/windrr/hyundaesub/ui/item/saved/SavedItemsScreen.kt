@@ -1,6 +1,5 @@
 package com.windrr.hyundaesub.ui.item.saved
 
-import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,7 +40,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +54,6 @@ import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokCardBorder
 import com.windrr.hyundaesub.ui.theme.ChagokNavy
 import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
-import com.windrr.hyundaesub.ui.theme.ChagokTextSecondary
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 
 /** 짐 선택 > "등록된 물건 불러오기": 저장해 둔 물건을 골라 수량과 함께 담는다 */
@@ -103,8 +101,12 @@ fun SavedItemsScreen(
             fontWeight = FontWeight.ExtraBold,
         )
         Spacer(Modifier.height(24.dp))
-        SearchField(query = state.query, onQueryChange = { onIntent(SavedItemsIntent.QueryChanged(it)) })
-        Spacer(Modifier.height(28.dp))
+        SearchField(
+            query = state.query,
+            onQueryChange = { onIntent(SavedItemsIntent.QueryChanged(it)) },
+            onClear = { onIntent(SavedItemsIntent.QueryChanged("")) },
+        )
+        Spacer(Modifier.height(40.dp))
 
         Box(modifier = Modifier.weight(1f)) {
             when {
@@ -112,14 +114,8 @@ fun SavedItemsScreen(
                     color = ChagokNavy,
                     modifier = Modifier.align(Alignment.Center),
                 )
-                state.isEmpty -> EmptyMessage(
-                    title = "아직 저장한 물건이 없어요",
-                    body = "자주 싣는 짐을 저장해 두면\n여기서 바로 불러올 수 있어요.",
-                )
-                state.isSearchEmpty -> EmptyMessage(
-                    title = "'${state.query.trim()}' 물건이 없어요",
-                    body = "다른 이름으로 검색해 보세요.",
-                )
+                // 저장한 물건이 없거나 검색 결과가 없으면 같은 문구 (디자인 가이드)
+                state.isEmpty || state.isSearchEmpty -> EmptyMessage()
                 else -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     contentPadding = PaddingValues(bottom = 20.dp),
@@ -149,7 +145,7 @@ fun SavedItemsScreen(
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Row(
         modifier = Modifier
@@ -175,37 +171,45 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Icon(
-            painter = painterResource(R.drawable.ic_search),
-            contentDescription = "검색",
-            tint = ChagokTextPrimary,
-            modifier = Modifier.size(24.dp),
-        )
+        if (query.isEmpty()) {
+            Icon(
+                painter = painterResource(R.drawable.ic_search),
+                contentDescription = "검색",
+                tint = ChagokTextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+        } else {
+            // 검색어가 있으면 돋보기 자리에 지우기 버튼
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(ClearButtonBackground)
+                    .clickable(onClick = onClear),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_clear),
+                    contentDescription = "검색어 지우기",
+                    tint = ClearButtonIcon,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun EmptyMessage(title: String, body: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.img_luggage_placeholder_applied),
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(text = title, color = ChagokTextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(text = body, color = ChagokTextSecondary, fontSize = 14.sp, textAlign = TextAlign.Center, lineHeight = 20.sp)
+private fun EmptyMessage() {
+    Box(modifier = Modifier.fillMaxSize().padding(bottom = 40.dp), contentAlignment = Alignment.Center) {
+        Text(text = "등록된 물건이 없어요.", color = EmptyText, fontSize = 16.sp)
     }
 }
 
 private val Placeholder = Color(0xFF8A90A0)
+private val EmptyText = Color(0xFF5A6273)
+private val ClearButtonBackground = Color(0xFFE6E9F0)
+private val ClearButtonIcon = Color(0xFF5A6273)
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "목록")
 @Composable
@@ -231,5 +235,21 @@ private fun SavedItemsScreenPreview() {
 private fun SavedItemsEmptyPreview() {
     HyundaeSubTheme {
         SavedItemsScreen(state = SavedItemsUiState(isLoading = false), onIntent = {}, onBack = {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 800, name = "검색 결과 없음")
+@Composable
+private fun SavedItemsSearchEmptyPreview() {
+    HyundaeSubTheme {
+        SavedItemsScreen(
+            state = SavedItemsUiState(
+                isLoading = false,
+                query = "조립식 침대",
+                allItems = listOf(SavedItem("1", "캠핑박스 L", 60, 40, 35)),
+            ),
+            onIntent = {},
+            onBack = {},
+        )
     }
 }
