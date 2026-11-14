@@ -42,8 +42,8 @@
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
 | `POST /api/v1/plans` | 🟡 | 🟡 | 계획 저장 화면 "계획 저장하기" (미연결) |
-| `GET /api/v1/plans` | ✅ | ⬜ | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 홈 "저장한 배치 계획" 예정 |
-| `GET /api/v1/plans/{plan_id}` | ⬜ | ⬜ | 계획 상세, Pleos에서 plan_id로 불러오기 |
+| `GET /api/v1/plans` | ✅ | 🔌 | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 홈 진입 시 `PlanSyncRepository`가 최근 20개를 기기 DB로 동기화 |
+| `GET /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
 | `PUT /api/v1/plans/{plan_id}` | ⬜ | ⬜ | 계획 전체 변경 (`expected_revision`) |
 | `PATCH /api/v1/plans/{plan_id}/metadata` | ⬜ | ⬜ | 서브앱 홈 즐겨찾기 별 (지금 서버 목록일 땐 동작 안 함) |
 | `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | ⬜ | 사용할 배치안 선택 |
@@ -85,11 +85,12 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 1 (`PUT /notifications/devices`) | 1 (`POST /cargo-reminders`) |
+| 🔌 연결만 | 1 (`PUT /notifications/devices`) | 3 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`) |
 | 🟡 등록만 | 3 (`POST /plans`, `POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 16 | 14 |
+| ⬜ 남음 | 16 | 12 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-14: Pleos 홈에서 서버 계획·짐 목록을 기기 DB로 동기화 (`GET /plans` + `GET /plans/{id}`).
 - 2026-11-14: 모바일 알림 3개 등록. 서브앱 기기 등록(토큰 동기화 연결)·해제, Pleos 짐 챙기기 알림(도착 서비스 연결). Pleos Base URL·Basic 인증 서브앱과 맞춤.
 - 2026-11-14: 체크리스트 작성. 서브앱 `GET /plans` 연결·실호출 200, Basic 인증·Base URL 정리.
