@@ -65,7 +65,7 @@
 ### 제품 검색
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/products/search` | ⬜ | ✅ | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력) · 빠른 확인. 외부 웹 검색+AI(DB 아님). 2026-11-15 `ProductSearchApiLiveTest` 실호출 성공(포엥 암체어 후보 8개, 가끔 503 `PRODUCT_SEARCH_UNAVAILABLE`). `candidates[].image_url`로 제품 사진(Coil), 비었거나 안 열리면 기본 짐 이미지 — 2026-11-15 13:40 재확인: 서버 응답·Swagger(`ProductCandidateData`)에 필드 자체가 없음 → 서버 배포 대기 |
+| `POST /api/v1/products/search` | ⬜ | ✅ | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력) · 빠른 확인. 외부 웹 검색+AI(DB 아님). 2026-11-15 `ProductSearchApiLiveTest` 실호출 성공(포엥 암체어 후보 8개, 가끔 503 `PRODUCT_SEARCH_UNAVAILABLE`). `candidates[].image_url`로 제품 사진(Coil), 비었거나 안 열리면 기본 짐 이미지 — 적절한 사진이 없으면 서버가 필드를 빼고 보냄 → 앱은 null과 같게 처리(기본 짐 이미지) |
 
 ### AI
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
