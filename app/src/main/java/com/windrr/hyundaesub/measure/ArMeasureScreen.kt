@@ -96,6 +96,7 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.windrr.hyundaesub.R
+import com.windrr.hyundaesub.ui.component.LightStatusBarIcons
 import com.windrr.hyundaesub.ar.ArMeasureRenderer
 import com.windrr.hyundaesub.ar.MeasureUiState
 import com.windrr.hyundaesub.ar.PreviewLine
@@ -294,6 +295,8 @@ private fun ArMeasureContent(
     }
 
     val textMeasurer = rememberTextMeasurer()
+    // 검은 카메라 화면 위라 상태바 아이콘은 흰색
+    LightStatusBarIcons()
 
     // 점을 찍을 때 잠깐 뜨는 안내 ("시작 지점을 추가했어요." / "끝 지점을 추가했어요.")
     var toast by remember { mutableStateOf<String?>(null) }

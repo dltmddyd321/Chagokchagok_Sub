@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.windrr.hyundaesub.R
+import com.windrr.hyundaesub.ui.component.LightStatusBarIcons
 import com.windrr.hyundaesub.data.local.entity.PlanCategory
 import com.windrr.hyundaesub.ui.theme.ChagokBackgroundTop
 import com.windrr.hyundaesub.ui.theme.ChagokNavy
@@ -102,19 +103,6 @@ fun HomePlansContent(
     }
 }
 
-/** 어두운 히어로 위라 상태바 아이콘을 흰색으로, 화면을 떠나면 원래대로 */
-@Composable
-private fun LightStatusBarIcons() {
-    val view = LocalView.current
-    if (view.isInEditMode) return
-    DisposableEffect(view) {
-        val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
-        val controller = WindowCompat.getInsetsController(window, view)
-        val previous = controller.isAppearanceLightStatusBars
-        controller.isAppearanceLightStatusBars = false
-        onDispose { controller.isAppearanceLightStatusBars = previous }
-    }
-}
 
 @Composable
 private fun HeroSection(recentPlans: List<PlanCardUi>, onNewPlan: () -> Unit) {
