@@ -53,7 +53,7 @@
 |---|---|---|---|
 | `POST /api/v1/plans/{plan_id}/calculations` | 🟡 | ✅ | **이미 저장된 계획**을 다시 계산할 때만. 새 계획은 `calculations/preview` → `POST /plans`. Pleos 계획 진행(변경 후): 저장 직후 `expected_revision` + `REPACK_ALL` + 전 좌석 EMPTY(USER)로 한 번, 응답 = 미리보기와 같은 계산 결과 + `calculation_id`. 서브앱 모델은 옛 형식 |
 | `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | ✅ | Pleos 내 계획 "배치도 미리보기": 계획의 `selected_calculation_id`(없으면 `latest_calculation_id`)로 조회 → `selected_arrangement_id` 배치를 탑뷰로 |
-| `POST /api/v1/calculations/preview` | 🔌 | 🔌 | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" → 적재 결과 화면: 인원 수만 보내고 `passenger_seats` 생략(서버가 자리 지정), 전 좌석 EMPTY로 보내야 좌석·접은 좌석 사용 (2026-11-15 curl 확인) |
+| `POST /api/v1/calculations/preview` | 🔌 | 🔌 | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" → 적재 결과 화면: 인원 수만 보내고 `passenger_seats` 생략(서버가 자리 지정), 전 좌석 EMPTY로 보내야 좌석·접은 좌석 사용 (2026-11-15 curl 확인) / 2026-11-15 계산 차량 `avante_demo`(더미) → **`tucson_hybrid`**(실측) 변경. 201이어도 `result_code=TIME_LIMIT`이면 "제한 시간 안에 배치안을 찾지 못했어요" (짐 4개 요청은 아직 TIME_LIMIT, 백엔드 개선 중) |
 
 ### 내 짐
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -91,6 +91,7 @@
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: 계산 차량 `tucson_hybrid`로 변경, TIME_LIMIT 안내 (두 앱).
 - 2026-11-15: 실서버 계획 흐름 확인 (서브앱 저장 → Pleos 동기화·미리 받기·수정·재계산·선택·안내), `PlanFlowApiLiveTest`.
 - 2026-11-15: Pleos 제품 검색 실호출 확인 + `image_url` 제품 사진(없으면 기본 짐 이미지).
 - 2026-11-15: Pleos 계획 진행하기: 변경 없으면 미리 받아 둔 선택 배치안·적재 안내로 바로 가이드, 변경했으면 확인 창 → `PUT /plans/{id}` → `POST /plans/{id}/calculations` → `PUT /plans/{id}/selection` → `POST /ai/loading-guides`(plan 기준) → 가이드·적재 완료.

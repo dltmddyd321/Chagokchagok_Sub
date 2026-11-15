@@ -23,12 +23,12 @@ data class RecommendInput(
 internal object PreviewRequestBuilder {
 
     /**
-     * 앱 차량 id → 서버 차량 id. 서버 차량 목록(GET /vehicles)에는 지금 아반떼 데모 하나뿐이라
-     * 앱의 아반떼를 그쪽으로 보낸다. 차량이 늘면 여기서 매핑한다.
+     * 앱 차량 id → 서버 차량 id. 1차는 투싼 하이브리드 고정 (서버 GET /vehicles의 tucson_hybrid, 실측 공간).
+     * 차량이 늘면 여기서 매핑한다.
      */
-    const val SERVER_AVANTE_ID = "avante_demo"
+    const val SERVER_VEHICLE_ID = "tucson_hybrid"
 
-    fun serverVehicleId(@Suppress("UNUSED_PARAMETER") localVehicleId: String?): String = SERVER_AVANTE_ID
+    fun serverVehicleId(@Suppress("UNUSED_PARAMETER") localVehicleId: String?): String = SERVER_VEHICLE_ID
 
     /** 이 차의 전체 좌석 (운전석 포함) */
     private val ALL_SEATS: List<SeatCode> = listOf(AvanteSeats.DRIVER) + AvanteSeats.SELECTABLE

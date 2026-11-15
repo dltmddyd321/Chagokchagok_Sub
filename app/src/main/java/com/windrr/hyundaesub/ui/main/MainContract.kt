@@ -67,6 +67,8 @@ enum class MainRoute {
 }
 
 data class MainUiState(
+    /** 배치안 없음 화면에서 시간 초과(TIME_LIMIT)였는지 */
+    val layoutTimedOut: Boolean = false,
     val selectedTab: MainTab = MainTab.HOME,
     val route: MainRoute = MainRoute.TABS,
     /** 차량 선택 단계에서 고른 차량 */
@@ -192,7 +194,8 @@ sealed interface MainIntent {
     data class ItemConfirmed(val item: PickedItem) : MainIntent
 
     /** 추천 화면: 배치를 못 찾음 → 실패 화면 */
-    data object NoLayoutFound : MainIntent
+    /** 배치안 없음. resultCode = 서버 result_code (TIME_LIMIT이면 시간 초과 안내) */
+    data class NoLayoutFound(val resultCode: String) : MainIntent
 
     /** 추천 화면 확인 → 계획 저장 */
     data class ArrangementConfirmed(val previewId: String, val arrangementId: String) : MainIntent

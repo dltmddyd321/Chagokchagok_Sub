@@ -38,10 +38,14 @@ import com.windrr.hyundaesub.ui.theme.ChagokTextPrimary
 import com.windrr.hyundaesub.ui.theme.ChagokTextSecondary
 import com.windrr.hyundaesub.ui.theme.HyundaeSubTheme
 
-/** 배치 추천 결과 없음: 현재 조건으로는 짐을 모두 실을 수 없을 때 */
+/**
+ * 배치 추천 결과 없음: 현재 조건으로는 짐을 모두 실을 수 없을 때.
+ * [timedOut] = 서버가 제한 시간 안에 탐색을 끝내지 못함(TIME_LIMIT) → 실을 수 없다고 단정하지 않는다
+ */
 @Composable
 fun LayoutFailedScreen(
     onBack: () -> Unit,
+    timedOut: Boolean = false,
     onNewPlan: () -> Unit,
     onChangeConditions: () -> Unit,
 ) {
@@ -70,7 +74,7 @@ fun LayoutFailedScreen(
         }
         Spacer(Modifier.height(40.dp))
         Text(
-            text = "가능한 배치안이 없어요",
+            text = if (timedOut) "제한 시간 안에\n배치안을 찾지 못했어요" else "가능한 배치안이 없어요",
             color = ChagokTextPrimary,
             fontSize = 28.sp,
             lineHeight = 38.sp,
@@ -78,7 +82,7 @@ fun LayoutFailedScreen(
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "현재 조건으로는 짐을 모두 실을 수 없어요.",
+            text = if (timedOut) "짐이 많으면 계산이 오래 걸려요. 잠시 후 다시 시도하거나 조건을 바꿔 보세요." else "현재 조건으로는 짐을 모두 실을 수 없어요.",
             color = ChagokTextSecondary,
             fontSize = 15.sp,
         )

@@ -23,7 +23,7 @@ class PreviewRequestBuilderTest {
 
     @Test
     fun passengers_includeDriver() {
-        assertEquals("avante_demo", request.plan.vehicleId)
+        assertEquals("tucson_hybrid", request.plan.vehicleId)
         assertEquals(2, request.plan.passengerCount)
         assertEquals(listOf("ROW_1_LEFT", "ROW_2_LEFT"), request.plan.passengerSeats)
     }

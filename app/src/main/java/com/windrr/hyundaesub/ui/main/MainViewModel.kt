@@ -118,7 +118,9 @@ class MainViewModel : ViewModel() {
                     pickedItems = it.pickedItems + intent.item,
                 )
             }
-            MainIntent.NoLayoutFound -> _state.update { it.copy(route = MainRoute.LAYOUT_FAILED) }
+            is MainIntent.NoLayoutFound -> _state.update {
+                it.copy(route = MainRoute.LAYOUT_FAILED, layoutTimedOut = intent.resultCode == RESULT_TIME_LIMIT)
+            }
             is MainIntent.ArrangementConfirmed -> _state.update {
                 it.copy(
                     route = MainRoute.PLAN_SAVE,
@@ -176,3 +178,6 @@ class MainViewModel : ViewModel() {
         return current.filterNot { it.key in addedKeys } + added
     }
 }
+
+/** 서버 result_code: 제한 시간 안에 배치 탐색을 끝내지 못함 */
+private const val RESULT_TIME_LIMIT = "TIME_LIMIT"

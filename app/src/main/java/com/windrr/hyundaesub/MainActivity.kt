@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
                         ),
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
                         onClose = { viewModel.onIntent(MainIntent.BackToTabs) },
-                        onNoLayout = { viewModel.onIntent(MainIntent.NoLayoutFound) },
+                        onNoLayout = { code -> viewModel.onIntent(MainIntent.NoLayoutFound(code)) },
                         onConfirmed = { previewId, arrangementId ->
                             viewModel.onIntent(MainIntent.ArrangementConfirmed(previewId, arrangementId))
                         },
@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
                         onGoHome = { viewModel.onIntent(MainIntent.GoHomeAfterSave) },
                     )
                     MainRoute.LAYOUT_FAILED -> LayoutFailedScreen(
+                        timedOut = state.layoutTimedOut,
                         onBack = { viewModel.onIntent(MainIntent.BackToItemSelect) },
                         onNewPlan = { viewModel.onIntent(MainIntent.StartLoadFlow) },
                         onChangeConditions = { viewModel.onIntent(MainIntent.ChangeConditions) },
