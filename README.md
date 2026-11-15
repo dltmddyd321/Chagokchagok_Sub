@@ -97,7 +97,8 @@ com.windrr.hyundaesub
    CHAGOK_API_PASSWORD=<Basic 인증 비밀번호>
    CHAGOK_NOTIFICATION_KEY=<알림 API 키>
    ```
-3. ARCore를 지원하는 기기에 설치합니다. AR 측정에는 카메라 권한과 'Google Play 서비스 AR'이 필요합니다.
+3. Firebase 콘솔에서 받은 `google-services.json`을 `app/` 폴더에 넣습니다. 이 파일도 저장소에 올라가지 않습니다(FCM 푸시에 필요).
+4. ARCore를 지원하는 기기에 설치합니다. AR 측정에는 카메라 권한과 'Google Play 서비스 AR'이 필요합니다.
    ```bash
    ./gradlew :app:installDebug
    ```
