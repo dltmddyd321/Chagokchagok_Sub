@@ -65,10 +65,9 @@ internal object PreviewRequestBuilder {
         heightCm = item.heightCm.toDouble(),
         quantity = item.quantity,
         requiredQuantity = if (item.required) item.quantity else 0,
-        // 내 물건은 1차에서 기기(Room)에만 저장한다. 그 id를 보내면 서버가 모르는 내 짐이라 422
-        // ("사용할 수 없는 내 짐 ID") → 서버에는 출처·id 없이 치수만 보낸다
+        // 서버에 등록된 내 짐만 saved_item_id를 보낸다. 기기에만 있는 id를 보내면 422 ("사용할 수 없는 내 짐 ID")
         dimensionSource = "UNSPECIFIED",
-        savedItemId = null,
+        savedItemId = item.serverItemId,
     )
 
     private const val OCCUPIED = "OCCUPIED"

@@ -17,7 +17,9 @@ data class PickedItem(
     val heightCm: Int,
     val quantity: Int = 1,
     val savedItemId: String? = null,
-    /** 대표 사진 (file:// URI). 없으면 기본 이미지 */
+    /** 서버 내 짐 id (등록된 경우만). 배치 요청에 saved_item_id로 보낸다 */
+    val serverItemId: String? = null,
+    /** 대표 사진: 기기 사진(file://) 또는 서버 사진 주소. 없으면 기본 이미지 */
     val photoUri: String? = null,
     /** 이번 배치 추천에 포함할지 (짐 선택 목록의 체크박스) */
     val selected: Boolean = true,

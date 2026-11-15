@@ -50,7 +50,15 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         /** 스키마 버전. 출시 전이라 올리면 기존 로컬 데이터는 지워진다 */
-        const val VERSION = 8
+        const val VERSION = 9
+
+        /** 8 → 9: 서버 내 짐 등록 여부·서버 사진 경로 */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE saved_item ADD COLUMN server_synced INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE saved_item ADD COLUMN photo_url TEXT")
+            }
+        }
 
         /** 7 → 8: 내 짐 대표 사진 칸 추가 (기존 내 짐은 그대로) */
         private val MIGRATION_7_8 = object : Migration(7, 8) {
@@ -68,7 +76,7 @@ abstract class AppDatabase : RoomDatabase() {
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
                     .addCallback(SeedVehicles)
-                    .addMigrations(MIGRATION_7_8)
+                    .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
                     // 출시 전이라 스키마가 바뀌면 기존 로컬 데이터는 버리고 새로 만든다
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()

@@ -58,9 +58,11 @@
 ### 내 짐
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/items` | ⬜ | ➖ | 측정값 확인 화면 저장 (지금 Room에만) |
-| `GET /api/v1/items` | ⬜ | ➖ | 내 물건 가져오기 (지금 Room) |
+| `POST /api/v1/items` | 🔌 | ➖ | 서브앱 측정값 확인 "저장": 서버 등록 → 서버 saved_item_id로 기기에 저장 (배치 요청에 saved_item_id로 보냄). 실패하면 기기에만 저장 |
+| `GET /api/v1/items` | 🔌 | ➖ | 서브앱 내 물건 불러오기 화면 들어올 때 한 번: 서버에만 있는 내 짐 추가, `photo_url` 갱신 |
 | `PATCH /api/v1/items/{saved_item_id}/favorite` | ⬜ | ➖ | |
+| `PUT /api/v1/items/{saved_item_id}/photo` | 🔌 | ➖ | 서브앱: 등록 직후 대표 사진(AR·갤러리 첫 장, JPEG) 바이트 업로드 (백그라운드). 최대 5 MiB |
+| `GET /api/v1/items/{saved_item_id}/photo` | 🔌 | ➖ | `photo_url`을 서버 주소 뒤에 붙여 Coil + 팀 인증 OkHttp로 표시. 기기 사진이 있으면 그걸 먼저, 없거나 실패하면 기본 짐 이미지 |
 
 ### 제품 검색
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -91,6 +93,7 @@
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: 서브앱 내 짐 서버 등록·사진 업로드·목록 동기화 (`/items`, `/items/{id}/photo`).
 - 2026-11-15: 계산 차량 `tucson_hybrid`로 변경, TIME_LIMIT 안내 (두 앱).
 - 2026-11-15: 실서버 계획 흐름 확인 (서브앱 저장 → Pleos 동기화·미리 받기·수정·재계산·선택·안내), `PlanFlowApiLiveTest`.
 - 2026-11-15: Pleos 제품 검색 실호출 확인 + `image_url` 제품 사진(없으면 기본 짐 이미지).

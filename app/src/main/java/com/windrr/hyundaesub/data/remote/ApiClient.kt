@@ -15,7 +15,8 @@ object ApiClient {
     /** 응답 대기: 제품 검색(웹 검색+AI)·배치 계산·AI 가이드는 서버에서 20초 넘게 걸리기도 한다 (2026-11-15 제품 검색 약 20초) */
     private const val READ_TIMEOUT_SECONDS = 60L
 
-    private val okHttpClient: OkHttpClient by lazy {
+    /** 서버 인증이 붙은 클라이언트. 사진(photo_url)도 이걸로 연다 */
+    internal val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -54,5 +55,12 @@ object ApiClient {
      * Retrofit은 baseUrl이 '/'로 끝나야 해서 없으면 붙인다.
      * 경로는 ChagokApi에서 "api/v1/..." (앞 '/' 없이) → https://chagokchagok-api.duckdns.org/api/v1/plans
      */
+    /** 서버가 준 경로(/api/v1/...)를 전체 주소로. 이미 http면 그대로, 비면 null */
+    fun absoluteUrl(path: String?): String? {
+        val p = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (p.startsWith("http")) return p
+        return baseUrl(BuildConfig.CHAGOK_API_BASE_URL) + p.removePrefix("/")
+    }
+
     internal fun baseUrl(raw: String): String = raw.trim().let { if (it.endsWith("/")) it else "$it/" }
 }

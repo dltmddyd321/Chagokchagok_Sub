@@ -23,6 +23,12 @@ interface SavedItemDao {
     @Upsert
     suspend fun upsert(vararg items: SavedItemEntity)
 
+    @Query("UPDATE saved_item SET photo_url = :photoUrl WHERE saved_item_id = :savedItemId")
+    suspend fun updatePhotoUrl(savedItemId: String, photoUrl: String?)
+
+    @Query("SELECT * FROM saved_item")
+    suspend fun all(): List<SavedItemEntity>
+
     @Query("DELETE FROM saved_item WHERE saved_item_id = :savedItemId")
     suspend fun delete(savedItemId: String)
 }

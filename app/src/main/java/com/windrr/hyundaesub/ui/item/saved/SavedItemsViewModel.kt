@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.windrr.hyundaesub.data.remote.SavedItemSync
 
 class SavedItemsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,6 +25,8 @@ class SavedItemsViewModel(application: Application) : AndroidViewModel(applicati
     val effect = _effect.receiveAsFlow()
 
     init {
+        // 다른 기기에서 등록한 내 짐·서버 사진 경로를 받아 둔다 (화면에 들어올 때 한 번)
+        viewModelScope.launch { SavedItemSync.pull(application) }
         viewModelScope.launch {
             source.observeAll().collect { items ->
                 _state.update { state ->
@@ -76,6 +79,7 @@ class SavedItemsViewModel(application: Application) : AndroidViewModel(applicati
                     heightCm = it.heightCm,
                     quantity = state.quantityOf(it.id),
                     savedItemId = it.id,
+                    serverItemId = it.id.takeIf { _ -> it.serverSynced },
                     photoUri = it.photoUri,
                 )
             }

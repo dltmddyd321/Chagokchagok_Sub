@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.windrr.hyundaesub.data.remote.ApiClient
+import com.windrr.hyundaesub.data.remote.SavedItemSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -86,9 +88,17 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
         )
         viewModelScope.launch {
             val photoUri = photoSource?.let { withContext(Dispatchers.IO) { ItemPhotoStore.keep(getApplication(), it, savedItemId) } }
-            val withPhoto = saved.copy(photoUri = photoUri)
-            savedItemDao.upsert(withPhoto)
-            _effect.send(ItemConfirmEffect.Saved(pickedOf(withPhoto, s.quantity)))
+            // 서버 내 짐으로 등록 (성공하면 서버 id로 저장 → 배치 요청에 saved_item_id로 보낼 수 있다). 실패해도 기기에는 저장
+            val server = SavedItemSync.register(saved)
+            val entity = saved.copy(
+                savedItemId = server?.savedItemId ?: savedItemId,
+                photoUri = photoUri,
+                serverSynced = server != null,
+            )
+            savedItemDao.upsert(entity)
+            // 사진은 등록 뒤 백그라운드로 올린다 (화면은 바로 넘어감)
+            if (server != null && photoUri != null) SavedItemSync.uploadPhotoLater(getApplication(), entity.savedItemId, photoUri)
+            _effect.send(ItemConfirmEffect.Saved(pickedOf(entity, s.quantity)))
         }
     }
 
@@ -100,7 +110,8 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
             heightCm = saved.heightCm,
             quantity = quantity,
             savedItemId = saved.savedItemId,
-            photoUri = saved.photoUri,
+            serverItemId = saved.savedItemId.takeIf { saved.serverSynced },
+            photoUri = saved.photoUri ?: ApiClient.absoluteUrl(saved.photoUrl),
         )
 
     private companion object {

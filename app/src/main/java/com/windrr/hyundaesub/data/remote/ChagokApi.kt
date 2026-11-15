@@ -15,6 +15,11 @@ import com.windrr.hyundaesub.data.remote.model.PlanSort
 import com.windrr.hyundaesub.data.remote.model.PreviewRequest
 import com.windrr.hyundaesub.data.remote.model.PreviewResponse
 import retrofit2.Response
+import com.windrr.hyundaesub.data.remote.model.ItemCreateRequest
+import com.windrr.hyundaesub.data.remote.model.ItemListResponse
+import com.windrr.hyundaesub.data.remote.model.ItemPhotoResponse
+import com.windrr.hyundaesub.data.remote.model.ItemResponse
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -84,6 +89,25 @@ interface ChagokApi {
     ): Response<ApiResponse<LoadingGuideResponse>>
 
     /** 폰 FCM 토큰 등록·갱신. device_id는 앱이 만든 UUID (같은 기기면 계속 같은 값) */
+    /** 내 짐 등록 → saved_item_id */
+    @POST("api/v1/items")
+    suspend fun createItem(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Body request: ItemCreateRequest,
+    ): Response<ApiResponse<ItemResponse>>
+
+    /** 내 짐 목록 (최신순) */
+    @GET("api/v1/items")
+    suspend fun getItems(@Query("limit") limit: Int = 100): Response<ApiResponse<ItemListResponse>>
+
+    /** 내 짐 사진 올리기·바꾸기. 본문 = JPEG/PNG 바이트 (Content-Type은 본문 타입으로) */
+    @PUT("api/v1/items/{saved_item_id}/photo")
+    suspend fun uploadItemPhoto(
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String,
+        @Path("saved_item_id") savedItemId: String,
+        @Body photo: RequestBody,
+    ): Response<ApiResponse<ItemPhotoResponse>>
+
     @PUT("api/v1/notifications/devices/{device_id}")
     suspend fun registerDevice(
         @Path("device_id") deviceId: String,

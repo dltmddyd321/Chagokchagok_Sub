@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.SubcomposeAsyncImage
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,7 +55,7 @@ fun ItemCard(
     maxQuantity: Int = Int.MAX_VALUE,
     /** 체크 모양: false = 사각 체크박스, true = 원형 체크 (짐 선택 화면 시안) */
     circleCheck: Boolean = false,
-    /** 대표 사진 (file:// URI). 없거나 못 열면 기본 이미지 */
+    /** 대표 사진: 기기 사진(file://) 또는 서버 사진 주소(팀 인증). 없거나 못 열면 기본 이미지 */
     photoUri: String? = null,
 ) {
     val shape = RoundedCornerShape(20.dp)
@@ -132,6 +133,7 @@ private fun ItemThumbnail(photoUri: String?) {
         } else {
             SubcomposeAsyncImage(
                 model = photoUri,
+                imageLoader = ChagokImageLoader.get(LocalContext.current),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { placeholder() } },

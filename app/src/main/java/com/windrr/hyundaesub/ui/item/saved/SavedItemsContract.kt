@@ -5,6 +5,7 @@ import com.windrr.hyundaesub.ui.component.sizeLabelOf
 import com.windrr.hyundaesub.ui.item.PickedItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.windrr.hyundaesub.data.remote.ApiClient
 
 /** 사용자가 저장해 둔 물건 ("자주 싣는 짐") */
 data class SavedItem(
@@ -15,8 +16,10 @@ data class SavedItem(
     val heightCm: Int,
     /** 불러올 때 기본 수량 */
     val defaultQuantity: Int = 1,
-    /** 대표 사진 (file:// URI). 없으면 기본 이미지 */
+    /** 대표 사진: 기기 사진(file://) 또는 서버 사진 주소. 없으면 기본 이미지 */
     val photoUri: String? = null,
+    /** 서버 내 짐으로 등록됐는지 */
+    val serverSynced: Boolean = false,
 ) {
     val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
 }
@@ -37,7 +40,8 @@ class RoomSavedItemsSource(private val dao: SavedItemDao) : SavedItemsSource {
                 depthCm = it.depthCm,
                 heightCm = it.heightCm,
                 defaultQuantity = it.defaultQuantity,
-                photoUri = it.photoUri,
+                photoUri = it.photoUri ?: ApiClient.absoluteUrl(it.photoUrl),
+                serverSynced = it.serverSynced,
             )
         }
     }

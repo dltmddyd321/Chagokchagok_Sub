@@ -41,6 +41,12 @@ data class SavedItemEntity(
     /** 대표 사진 (앱 내부 저장소 file:// URI). 없으면 기본 이미지 */
     @ColumnInfo(name = "photo_uri")
     val photoUri: String? = null,
+    /** 서버(POST /items)에 등록됐는지. true면 [savedItemId]가 서버 saved_item_id */
+    @ColumnInfo(name = "server_synced")
+    val serverSynced: Boolean = false,
+    /** 서버 사진 경로 (GET /items의 photo_url). 기기 사진이 없을 때 이걸로 연다 */
+    @ColumnInfo(name = "photo_url")
+    val photoUrl: String? = null,
     /** 등록 시각 (epoch ms) — 최근 등록 순 정렬 */
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
