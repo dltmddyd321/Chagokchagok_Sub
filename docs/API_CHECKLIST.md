@@ -44,7 +44,7 @@
 | `POST /api/v1/plans` | 🔌 | 🟡 | 서브앱 계획 저장 화면 "계획 저장하기": `{source_preview_id, selected_arrangement_id}`로 생성 → plan_id·revision. (짐 직접 보내는 PlanCreate는 등록만) |
 | `GET /api/v1/plans` | ✅ | 🔌 | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 앱 시작 시 `PlanSyncRepository`가 **최신 1개**(`limit=1`)를 기기 DB로 동기화 → 홈 최신 계획 카드·도착 감지 |
 | `GET /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
-| `PUT /api/v1/plans/{plan_id}` | ⬜ | ⬜ | 계획 전체 변경 (`expected_revision`) |
+| `PUT /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 내 계획: 짐 수정(이름·수량·치수)·동승자 변경 때 한 번씩 전체 변경 (`expected_revision`, 인원 바뀌면 `passenger_seats` 생략). 409면 최신 다시 조회 |
 | `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision) / 홈 즐겨찾기 별: `{expected_revision, is_favorite}`만 보내고(이름 등은 생략) 끝나면 서버 목록 다시 조회 |
 | `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | ⬜ | 사용할 배치안 선택 |
 
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 0 |
-| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 6 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`) |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 7 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 13 | 9 |
+| ⬜ 남음 | 13 | 8 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: Pleos 내 계획 상세 + `PUT /plans/{id}`로 짐·동승자 수정 저장.
 - 2026-11-15: Pleos 빠른 확인(제품 검색 → 기기 DB 실측으로 들어가는지 판정).
 - 2026-11-15: X-Notification-Key 받음 → 기기 등록·해제 실호출 200, 짐 챙기기 알림 인증 통과.
 - 2026-11-15: Pleos 적재 가이드 `POST /ai/loading-guides` 연결 (적재 가능 시 미리 받기, 이 조건으로 진행 → 가이드 화면).
