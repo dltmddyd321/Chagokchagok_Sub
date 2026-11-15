@@ -91,14 +91,14 @@ com.windrr.hyundaesub
 
 | 항목 | 내용 |
 |---|---|
-| APK | [`apk/차곡차곡_차곡차곡서브_release.apk`](apk/차곡차곡_차곡차곡서브_release.apk) (release 서명) |
+| APK | [`apk/차곡_차곡차곡서브_release.apk`](apk/차곡_차곡차곡서브_release.apk) (release 서명) |
 | 테스트 기기 | Galaxy S24 (SM-S921N). Android 9(API 28) 이상, ARCore 지원 기기 |
 | 화면 규격 | 휴대폰 세로 화면 (360dp 폭 기준 디자인) |
 | 차량 앱 | Pleos 앱은 Pleos Connect Emulator **v2.1.0** (2560×1440, 160dpi)에서 확인했습니다 → [Pleos 앱 저장소](https://github.com/dltmddyd321/Chagokchagok) |
 
 APK 설치·확인 방법:
 ```bash
-adb install apk/차곡차곡_차곡차곡서브_release.apk
+adb install apk/차곡_차곡차곡서브_release.apk
 ```
 - AR 측정에는 카메라 권한과 'Google Play 서비스 AR'이 필요합니다. 지원하지 않는 기기에서는 직접 입력으로 짐을 등록합니다.
 - 짐 챙기기 알림(FCM)을 받으려면 알림 권한을 허용합니다.
