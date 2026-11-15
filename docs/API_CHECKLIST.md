@@ -21,7 +21,7 @@
 | Base URL (`https://chagokchagok-api.duckdns.org`, 끝 `/` 자동 처리) | ✅ | 🔌 서브앱과 같게 맞춤 (실호출 미확인) |
 | Basic 인증 (`local.properties`: `CHAGOK_API_USERNAME` / `CHAGOK_API_PASSWORD`) | ✅ | 🔌 |
 | 로그에서 Authorization 가림 | ✅ | ✅ |
-| `X-Notification-Key` 헤더 (알림 API, `local.properties`: `CHAGOK_NOTIFICATION_KEY`, 비면 생략) | 🔌 | 🔌 |
+| `X-Notification-Key` 헤더 (알림 API 필수, 없으면 401 `NOTIFICATION_UNAUTHORIZED`. `local.properties`: `CHAGOK_NOTIFICATION_KEY`) | ✅ | ✅ |
 | `Idempotency-Key` 헤더 (POST/PUT/PATCH) | ✅ 등록된 API만 | ✅ 등록된 API만 |
 
 ## API 목록 (Swagger 기준 22개)
@@ -76,21 +76,22 @@
 ### 알림
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `PUT /api/v1/notifications/devices/{device_id}` | 🔌 | ➖ | 앱 시작·토큰 갱신 시 `PushTokenSync`가 등록. device_id는 앱이 만든 UUID. 실호출 테스트 `NotificationApiLiveTest` 작성(미실행) |
-| `DELETE /api/v1/notifications/devices/{device_id}` | 🟡 | ➖ | `PushTokenSync.unregister()` 준비. 알림 끄기 화면 생기면 연결 |
-| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | 🔌 | `ArrivalReminderService`: 도착+P단이면 `DESTINATION_ARRIVED`, 문 열림이면 `DOOR_OPENED`. 차량 알림과 같이 보냄. 실호출 테스트 `CargoReminderApiLiveTest` 작성(미실행) |
+| `PUT /api/v1/notifications/devices/{device_id}` | ✅ | ➖ | 앱 시작·토큰 갱신 시 `PushTokenSync`가 등록. device_id는 앱이 만든 UUID. 2026-11-15 `NotificationApiLiveTest` 등록 200 |
+| `DELETE /api/v1/notifications/devices/{device_id}` | 🟡 | ➖ | `PushTokenSync.unregister()` 준비 (2026-11-15 실호출 해제 200). 알림 끄기 화면 생기면 연결 |
+| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | 🔌 | `ArrivalReminderService`: 도착+P단이면 `DESTINATION_ARRIVED`, 문 열림이면 `DOOR_OPENED`. 차량 알림과 같이 보냄. 2026-11-15 키 인증 통과 확인(없는 계획이라 404 PLAN_NOT_FOUND) |
 
 ## 요약
 
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
-| ✅ 연결·호출 확인 | 1 (`GET /plans`) | 0 |
-| 🔌 연결만 | 5 (`PUT /notifications/devices`, `POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 6 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`) |
+| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 0 |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 6 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
 | ⬜ 남음 | 13 | 9 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: X-Notification-Key 받음 → 기기 등록·해제 실호출 200, 짐 챙기기 알림 인증 통과.
 - 2026-11-15: Pleos 적재 가이드 `POST /ai/loading-guides` 연결 (적재 가능 시 미리 받기, 이 조건으로 진행 → 가이드 화면).
 - 2026-11-15: Pleos 적재 가능 여부 확인에 `POST /calculations/preview` 연결 (적재 결과 화면), 좌석 착석 센서로 동승자 기본값.
 - 2026-11-14: 서브앱 홈 즐겨찾기 별을 `PATCH metadata`로 연결.
