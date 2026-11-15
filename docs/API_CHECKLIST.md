@@ -65,7 +65,7 @@
 ### 제품 검색
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/products/search` | ⬜ | 🔌 | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력). 외부 웹 검색+AI(DB 아님). 2026-11-14 curl: 503 `PRODUCT_SEARCH_UNAVAILABLE`(서버 검색 꺼짐) → 앱은 직접 입력 안내 / Pleos "빠른 확인" 탭도 사용: 찾은 치수를 기기 DB 투싼 실측으로 앱이 판정 |
+| `POST /api/v1/products/search` | ⬜ | ✅ | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력) · 빠른 확인. 외부 웹 검색+AI(DB 아님). 2026-11-15 `ProductSearchApiLiveTest` 실호출 성공(포엥 암체어 후보 8개, 가끔 503 `PRODUCT_SEARCH_UNAVAILABLE`). `candidates[].image_url`로 제품 사진(Coil), 비었거나 안 열리면 기본 짐 이미지 — 2026-11-15 기준 서버 응답·Swagger에 아직 없음 |
 
 ### AI
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -84,13 +84,14 @@
 
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
-| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 0 |
-| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 10 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`) |
+| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 1 (`POST /products/search`) |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 9 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 1 (`POST /plans`) |
 | ⬜ 남음 | 13 | 7 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: Pleos 제품 검색 실호출 확인 + `image_url` 제품 사진(없으면 기본 짐 이미지).
 - 2026-11-15: Pleos 계획 진행하기: 변경 없으면 미리 받아 둔 선택 배치안·적재 안내로 바로 가이드, 변경했으면 확인 창 → `PUT /plans/{id}` → `POST /plans/{id}/calculations` → `PUT /plans/{id}/selection` → `POST /ai/loading-guides`(plan 기준) → 가이드·적재 완료.
 - 2026-11-15: Pleos 배치도 미리보기 (`GET /plans/{id}/calculations/{calc_id}`).
 - 2026-11-15: Pleos 내 계획 상세 + `PUT /plans/{id}`로 짐·동승자 수정 저장.
