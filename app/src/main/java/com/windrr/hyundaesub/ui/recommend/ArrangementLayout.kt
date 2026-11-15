@@ -121,19 +121,29 @@ internal object ArrangementLayoutMapper {
     }
 
     /** 공간 안 위치(cm) → 이미지 px. 공간 밖으로 나가는 값은 공간 경계로 자른다 */
+    /**
+     * 공간 안 위치(cm) → 이미지 px. **가로·세로 같은 축척**으로 그려 짐 모양이 실제 비율 그대로 보이게 한다.
+     * 탑뷰 이미지의 트렁크 칸은 실제(123×100cm)보다 납작해서(가로 5.3px/cm, 세로 2.4px/cm)
+     * 칸에 맞춰 늘리면 냉장고·전자레인지가 옆으로 길쭉해 보였다.
+     * - 축척 = 칸에 들어가는 가장 큰 값 (트렁크는 2열 좌석 표시칸 바로 아래까지 위로 써도 된다)
+     * - 공간은 칸 가운데, 뒤(y=0)는 칸 아래(트렁크 입구)에 맞춘다
+     */
     fun toImageRect(area: PxRect, space: PackingSpaceResponse, xCm: Double, yCm: Double, extentX: Double, extentY: Double): PxRect {
         val w = space.widthCm.takeIf { it > 0 } ?: 1.0
         val d = space.depthCm.takeIf { it > 0 } ?: 1.0
-        val x0 = (xCm / w).coerceIn(0.0, 1.0)
-        val x1 = ((xCm + extentX) / w).coerceIn(0.0, 1.0)
-        val y0 = (yCm / d).coerceIn(0.0, 1.0)
-        val y1 = ((yCm + extentY) / d).coerceIn(0.0, 1.0)
+        val usableHeight = if (space.kind == KIND_TRUNK) area.bottom - VehicleTopView.TRUNK_MAX_TOP else area.height
+        val scale = minOf(area.width / w, usableHeight / d)
+        val drawLeft = area.left + (area.width - w * scale) / 2
+        val x0 = xCm.coerceIn(0.0, w)
+        val x1 = (xCm + extentX).coerceIn(0.0, w)
+        val y0 = yCm.coerceIn(0.0, d)
+        val y1 = (yCm + extentY).coerceIn(0.0, d)
         return PxRect(
-            left = area.left + (area.width * x0).toFloat(),
-            right = area.left + (area.width * x1).toFloat(),
+            left = (drawLeft + x0 * scale).toFloat(),
+            right = (drawLeft + x1 * scale).toFloat(),
             // y=0(뒤)이 이미지 아래
-            top = area.bottom - (area.height * y1).toFloat(),
-            bottom = area.bottom - (area.height * y0).toFloat(),
+            top = (area.bottom - y1 * scale).toFloat(),
+            bottom = (area.bottom - y0 * scale).toFloat(),
         )
     }
 
@@ -189,6 +199,9 @@ internal object VehicleTopView {
 
     /** 트렁크 바닥 */
     val TRUNK = PxRect(175f, 1162f, 825f, 1405f)
+
+    /** 트렁크 짐을 실제 비율로 그릴 때 위로 써도 되는 한계 (2열 시트 아래 끝에 거의 닿는 곳) */
+    const val TRUNK_MAX_TOP = 1110f
 
     fun seatMarkRect(seat: SeatCode): PxRect {
         val (cx, cy) = SEAT_CENTERS.getValue(seat)

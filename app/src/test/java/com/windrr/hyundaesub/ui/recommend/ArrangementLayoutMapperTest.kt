@@ -63,13 +63,17 @@ class ArrangementLayoutMapperTest {
     }
 
     @Test
-    fun trunkItem_startsAtLeftRearCorner() {
-        val rect = layout.items[0].rect
+    fun trunkItem_keepsRealProportion_andStartsAtRearCorner() {
+        val rect = layout.items[0].rect // 90 × 100 cm, 트렁크 97 × 110 cm 왼쪽 뒤 구석
         val trunkRect = VehicleTopView.TRUNK
-        assertEquals(trunkRect.left, rect.left, 0.01f)
-        assertEquals(trunkRect.bottom, rect.bottom, 0.01f) // y=0(뒤) = 이미지 아래
-        assertEquals(trunkRect.left + trunkRect.width * (90f / 97f), rect.right, 0.5f)
-        assertEquals(trunkRect.bottom - trunkRect.height * (100f / 110f), rect.top, 0.5f)
+        // 가로·세로 같은 축척 → 화면 비율 = 실제 비율
+        assertEquals(90f / 100f, rect.width / rect.height, 0.01f)
+        // 뒤(y=0)는 트렁크 입구 쪽 아래
+        assertEquals(trunkRect.bottom, rect.bottom, 0.01f)
+        // 위로는 2열 좌석 표시칸 아래까지만
+        assertTrue(rect.top >= VehicleTopView.TRUNK_MAX_TOP - 0.5f)
+        // 공간이 가운데 정렬되어 왼쪽 끝은 칸 안쪽
+        assertTrue(rect.left >= trunkRect.left)
     }
 
     @Test
