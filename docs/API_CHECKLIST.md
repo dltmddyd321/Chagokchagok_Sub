@@ -41,18 +41,18 @@
 ### 적재 계획
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/plans` | 🔌 | 🟡 | 서브앱 계획 저장 화면 "계획 저장하기": `{source_preview_id, selected_arrangement_id}`로 생성 → plan_id·revision. (짐 직접 보내는 PlanCreate는 등록만) |
-| `GET /api/v1/plans` | ✅ | 🔌 | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 앱 시작 시 `PlanSyncRepository`가 **최신 1개**(`limit=1`)를 기기 DB로 동기화 → 홈 최신 계획 카드·도착 감지 |
-| `GET /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
-| `PUT /api/v1/plans/{plan_id}` | ⬜ | 🔌 | Pleos 내 계획: 짐 수정·동승자 변경은 화면에만 들고 있다가 "계획 진행하기 → 저장하고 진행"에서 한 번 전체 변경 (`expected_revision`, 인원 바뀌면 `passenger_seats` 생략). 409면 최신 다시 조회 |
-| `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision) / 홈 즐겨찾기 별: `{expected_revision, is_favorite}`만 보내고(이름 등은 생략) 끝나면 서버 목록 다시 조회 |
-| `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | 🔌 | Pleos 계획 진행(변경 후): 재계산의 1순위 배치안을 선택 (`expected_revision`, `calculation_id`, `arrangement_id`). 실패해도 가이드는 계속 |
+| `POST /api/v1/plans` | 🔌 | 🟡 | 서브앱 계획 저장 화면 "계획 저장하기": `{source_preview_id, selected_arrangement_id}`로 생성 → plan_id·revision. (짐 직접 보내는 PlanCreate는 등록만) / 2026-11-15 실서버 흐름 확인: 서브앱과 같은 요청으로 저장 201 (선택 배치안이 계산에 1개로 저장, arrangement_id는 새로 발급) |
+| `GET /api/v1/plans` | ✅ | ✅ | 서브앱 홈: 최근(`sort=latest`)·즐겨찾기(`favorite=true`). 2026-11-14 실호출 200 (계획 0개) / Pleos 앱 시작 시 `PlanSyncRepository`가 **최신 1개**(`limit=1`)를 기기 DB로 동기화 → 홈 최신 계획 카드·도착 감지 |
+| `GET /api/v1/plans/{plan_id}` | ⬜ | ✅ | Pleos 동기화 때 계획마다 상세로 짐 크기까지 받아 기기 DB(plan·plan_item·plan_car_seat)에 저장. 내용 같으면 건너뜀 |
+| `PUT /api/v1/plans/{plan_id}` | ⬜ | ✅ | Pleos 내 계획: 짐 수정·동승자 변경은 화면에만 들고 있다가 "계획 진행하기 → 저장하고 진행"에서 한 번 전체 변경 (`expected_revision`, 인원 바뀌면 `passenger_seats` 생략). 409면 최신 다시 조회 / 2026-11-15 실서버 흐름 확인: revision +1, **선택 배치안이 null로 초기화** → 재계산·선택 필요 |
+| `PATCH /api/v1/plans/{plan_id}/metadata` | 🔌 | ⬜ | 서브앱 계획 저장 2단계: 이름·카테고리·메모 (`expected_revision` = 생성 응답 revision) / 홈 즐겨찾기 별: `{expected_revision, is_favorite}`만 보내고(이름 등은 생략) 끝나면 서버 목록 다시 조회 / 2026-11-15 실서버 흐름 확인: 즐겨찾기만 보내도 이름·메모 유지, revision 그대로 |
+| `PUT /api/v1/plans/{plan_id}/selection` | ⬜ | ✅ | Pleos 계획 진행(변경 후): 재계산의 1순위 배치안을 선택 (`expected_revision`, `calculation_id`, `arrangement_id`). 실패해도 가이드는 계속 / 2026-11-15 실서버 흐름 확인: 재계산은 revision을 올리지 않음 → PUT 응답 revision 그대로 사용 |
 
 ### 적재 계산
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/plans/{plan_id}/calculations` | 🟡 | 🔌 | **이미 저장된 계획**을 다시 계산할 때만. 새 계획은 `calculations/preview` → `POST /plans`. Pleos 계획 진행(변경 후): 저장 직후 `expected_revision` + `REPACK_ALL` + 전 좌석 EMPTY(USER)로 한 번, 응답 = 미리보기와 같은 계산 결과 + `calculation_id`. 서브앱 모델은 옛 형식 |
-| `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | 🔌 | Pleos 내 계획 "배치도 미리보기": 계획의 `selected_calculation_id`(없으면 `latest_calculation_id`)로 조회 → `selected_arrangement_id` 배치를 탑뷰로 |
+| `POST /api/v1/plans/{plan_id}/calculations` | 🟡 | ✅ | **이미 저장된 계획**을 다시 계산할 때만. 새 계획은 `calculations/preview` → `POST /plans`. Pleos 계획 진행(변경 후): 저장 직후 `expected_revision` + `REPACK_ALL` + 전 좌석 EMPTY(USER)로 한 번, 응답 = 미리보기와 같은 계산 결과 + `calculation_id`. 서브앱 모델은 옛 형식 |
+| `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | ✅ | Pleos 내 계획 "배치도 미리보기": 계획의 `selected_calculation_id`(없으면 `latest_calculation_id`)로 조회 → `selected_arrangement_id` 배치를 탑뷰로 |
 | `POST /api/v1/calculations/preview` | 🔌 | 🔌 | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" → 적재 결과 화면: 인원 수만 보내고 `passenger_seats` 생략(서버가 자리 지정), 전 좌석 EMPTY로 보내야 좌석·접은 좌석 사용 (2026-11-15 curl 확인) |
 
 ### 내 짐
@@ -71,7 +71,7 @@
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
 | `POST /api/v1/ai/messages` | ⬜ | ⬜ | |
-| `POST /api/v1/ai/loading-guides` | 🔌 | 🔌 | 서브앱 배치 추천: 배치안이 나오면 곧장 배치안마다 `{preview_id, arrangement_id}`로 요청 → "가이드 보기" 화면. 2026-11-14 curl 확인: 지금은 `source=FALLBACK`, `steps` 빈 배열 → 앱이 싣는 순서로 기본 문구 생성 / Pleos: 적재 가능이면 결과가 나오자마자 배치안마다 미리 받아 두고 "이 조건으로 진행" → 적재 가이드 화면 / Pleos 내 계획: 앱 시작 때 선택 배치안을 `{plan_id, calculation_id, arrangement_id}`로 미리 받아 둠 → 변경 없으면 "계획 진행하기"가 바로 가이드, 변경 후엔 재계산 결과로 다시 받음 |
+| `POST /api/v1/ai/loading-guides` | 🔌 | ✅ | 서브앱 배치 추천: 배치안이 나오면 곧장 배치안마다 `{preview_id, arrangement_id}`로 요청 → "가이드 보기" 화면. 2026-11-14 curl 확인: 지금은 `source=FALLBACK`, `steps` 빈 배열 → 앱이 싣는 순서로 기본 문구 생성 / Pleos: 적재 가능이면 결과가 나오자마자 배치안마다 미리 받아 두고 "이 조건으로 진행" → 적재 가이드 화면 / Pleos 내 계획: 앱 시작 때 선택 배치안을 `{plan_id, calculation_id, arrangement_id}`로 미리 받아 둠 → 변경 없으면 "계획 진행하기"가 바로 가이드, 변경 후엔 재계산 결과로 다시 받음 / 2026-11-15 실서버 흐름 확인: plan 기준 source=AI, steps 옴 (문장이 좌표·WDH 등 기술 표현 위주) |
 
 ### 알림
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -84,13 +84,14 @@
 
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
-| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 1 (`POST /products/search`) |
-| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 9 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`) |
+| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 8 (`POST /products/search`, `GET /plans`, `GET /plans/{id}`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`, `POST /ai/loading-guides`) |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) — 같은 요청 모양으로 실서버 확인(앱 실행 X) | 2 (`POST /cargo-reminders`, `POST /calculations/preview`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 1 (`POST /plans`) |
 | ⬜ 남음 | 13 | 7 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: 실서버 계획 흐름 확인 (서브앱 저장 → Pleos 동기화·미리 받기·수정·재계산·선택·안내), `PlanFlowApiLiveTest`.
 - 2026-11-15: Pleos 제품 검색 실호출 확인 + `image_url` 제품 사진(없으면 기본 짐 이미지).
 - 2026-11-15: Pleos 계획 진행하기: 변경 없으면 미리 받아 둔 선택 배치안·적재 안내로 바로 가이드, 변경했으면 확인 창 → `PUT /plans/{id}` → `POST /plans/{id}/calculations` → `PUT /plans/{id}/selection` → `POST /ai/loading-guides`(plan 기준) → 가이드·적재 완료.
 - 2026-11-15: Pleos 배치도 미리보기 (`GET /plans/{id}/calculations/{calc_id}`).
