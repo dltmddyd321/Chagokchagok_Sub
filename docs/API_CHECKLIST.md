@@ -65,7 +65,7 @@
 ### 제품 검색
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
-| `POST /api/v1/products/search` | ⬜ | ✅ | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력) · 빠른 확인. 외부 웹 검색+AI(DB 아님). 2026-11-15 `ProductSearchApiLiveTest` 실호출 성공(포엥 암체어 후보 8개, 가끔 503 `PRODUCT_SEARCH_UNAVAILABLE`). `candidates[].image_url`로 제품 사진(Coil), 비었거나 안 열리면 기본 짐 이미지 — 2026-11-15 기준 서버 응답·Swagger에 아직 없음 |
+| `POST /api/v1/products/search` | ⬜ | ✅ | Pleos "제품명 말하기" 인식 → 검색 → "찾은 제품 규격" 창(운반 상태별 후보, 빠진 치수는 직접 입력) · 빠른 확인. 외부 웹 검색+AI(DB 아님). 2026-11-15 `ProductSearchApiLiveTest` 실호출 성공(포엥 암체어 후보 8개, 가끔 503 `PRODUCT_SEARCH_UNAVAILABLE`). `candidates[].image_url`로 제품 사진(Coil), 비었거나 안 열리면 기본 짐 이미지 — 2026-11-15 13:40 재확인: 서버 응답·Swagger(`ProductCandidateData`)에 필드 자체가 없음 → 서버 배포 대기 |
 
 ### AI
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
@@ -78,14 +78,14 @@
 |---|---|---|---|
 | `PUT /api/v1/notifications/devices/{device_id}` | ✅ | ➖ | 앱 시작·토큰 갱신 시 `PushTokenSync`가 등록. device_id는 앱이 만든 UUID. 2026-11-15 `NotificationApiLiveTest` 등록 200 |
 | `DELETE /api/v1/notifications/devices/{device_id}` | 🟡 | ➖ | `PushTokenSync.unregister()` 준비 (2026-11-15 실호출 해제 200). 알림 끄기 화면 생기면 연결 |
-| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | 🔌 | `ArrivalReminderService`: 도착+P단이면 `DESTINATION_ARRIVED`, 문 열림이면 `DOOR_OPENED`. 차량 알림과 같이 보냄. 2026-11-15 키 인증 통과 확인(없는 계획이라 404 PLAN_NOT_FOUND) |
+| `POST /api/v1/plans/{plan_id}/cargo-reminders` | ➖ | ✅ | `ArrivalReminderService`: 도착+P단이면 `DESTINATION_ARRIVED`, 문 열림이면 `DOOR_OPENED`. 차량 알림과 같이 보냄. 2026-11-15 키 인증 통과 확인(없는 계획이라 404 PLAN_NOT_FOUND) / 2026-11-15 실계획으로 201 ACCEPTED, 등록 기기 1대에 전달 접수 |
 
 ## 요약
 
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
-| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 8 (`POST /products/search`, `GET /plans`, `GET /plans/{id}`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`, `POST /ai/loading-guides`) |
-| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) — 같은 요청 모양으로 실서버 확인(앱 실행 X) | 2 (`POST /cargo-reminders`, `POST /calculations/preview`) |
+| ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 9 (`POST /products/search`, `GET /plans`, `GET /plans/{id}`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`, `POST /plans/{id}/calculations`, `PUT /plans/{id}/selection`, `POST /ai/loading-guides`, `POST /cargo-reminders`) |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) — 같은 요청 모양으로 실서버 확인(앱 실행 X) | 1 (`POST /calculations/preview`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 1 (`POST /plans`) |
 | ⬜ 남음 | 13 | 7 |
 | ➖ 안 씀 | 1 | 5 |
