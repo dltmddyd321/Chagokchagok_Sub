@@ -98,6 +98,7 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 import com.windrr.hyundaesub.R
 import com.windrr.hyundaesub.ui.component.LightStatusBarIcons
 import com.windrr.hyundaesub.ar.ArMeasureRenderer
+import com.windrr.hyundaesub.ar.CaptureRejection
 import com.windrr.hyundaesub.ar.MeasureUiState
 import com.windrr.hyundaesub.ar.PreviewLine
 import com.windrr.hyundaesub.ar.TrackingIssue
@@ -198,6 +199,8 @@ private fun ArMeasureContent(
     val trashRadiusPx = with(LocalDensity.current) { 22.dp.toPx() }
     var uiState by remember { mutableStateOf(MeasureUiState()) }
     var error by remember { mutableStateOf<MeasureError?>(null) }
+    // 점을 찍지 못한 이유 (+ 누를 때마다 새 값이 되도록 시각과 함께)
+    var rejection by remember { mutableStateOf<Pair<CaptureRejection, Long>?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         var session: Session? = null
@@ -229,6 +232,7 @@ private fun ArMeasureContent(
                         displayRotation = { glView.display?.rotation ?: 0 },
                         shape = shape,
                         snapRadiusPx = snapRadiusPx,
+                        onCaptureRejected = { reason -> glView.post { rejection = reason to System.nanoTime() } },
                     ) { state ->
                         glView.post { uiState = state }
                     }
@@ -310,6 +314,11 @@ private fun ArMeasureContent(
         }
         lastPointCount = pointCount
     }
+    LaunchedEffect(rejection) {
+        val reason = rejection?.first ?: return@LaunchedEffect
+        toast = context.getString(if (reason == CaptureRejection.TOO_SHORT) R.string.ar_toast_too_short else R.string.ar_toast_no_surface)
+        toastKey++
+    }
     LaunchedEffect(toastKey) {
         if (toast != null) {
             delay(1500)
@@ -341,8 +350,11 @@ private fun ArMeasureContent(
 
     // 크기 측정 버튼으로 필요한 선을 다 재면 다음 화면으로.
     // 가로·세로·높이는 잰 순서가 아니라 선 방향으로 정한다 (가장 수직인 선 = 높이)
-    LaunchedEffect(uiState.lengthsCm.size, uiState.waitingEnd) {
-        if (uiState.waitingEnd) return@LaunchedEffect
+    // 필요한 선을 다 쟀으면 그 뒤에 + 를 더 눌러도(시작점 대기) 넘어간다
+    val needed = if (shape == MeasureShape.CYLINDER) 2 else 3
+    val measuredDone = uiState.lengthsCm.size >= needed
+    LaunchedEffect(measuredDone) {
+        if (!measuredDone) return@LaunchedEffect
         val size = MeasureGeometry.assignDimensions(uiState.lengthsCm, uiState.verticalRatios, shape) ?: return@LaunchedEffect
         delay(400) // 마지막 선이 그려지는 걸 잠깐 보여주고
         onMeasured(size, lastPhotoUri)
@@ -408,7 +420,8 @@ private fun ArMeasureContent(
             )
         } else if (!scanning) {
             DimensionHint(
-                measuredCount = uiState.segments.size,
+                // 화면에 보이는 선(segments)은 카메라 밖이면 빠지므로 잰 선 수는 lengthsCm 기준
+                measuredCount = uiState.lengthsCm.size,
                 shape = shape,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -470,7 +483,7 @@ private fun ArMeasureContent(
                 )
                 // 가운데: 크기 측정 (시작점·끝점 찍기)
                 MeasureButton(
-                    enabled = !scanning && (uiState.aimDistanceCm != null),
+                    enabled = !scanning && uiState.aimDistanceCm != null && !measuredDone,
                     onClick = { renderer?.captureAtAim() },
                     modifier = Modifier.align(Alignment.Center),
                 )

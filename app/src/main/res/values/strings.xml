@@ -35,6 +35,8 @@
     <string name="ar_toast_start_point">시작 지점을 추가했어요</string>
     <string name="ar_toast_end_point">끝 지점을 추가했어요</string>
     <string name="ar_toast_photo">사진을 찍었어요</string>
+    <string name="ar_toast_no_surface">표면을 찾지 못했어요. 조준점을 물건 모서리에 맞추고 다시 눌러 주세요</string>
+    <string name="ar_toast_too_short">시작 지점과 너무 가까워요. 끝 지점을 다시 찍어 주세요</string>
 
     <!-- AR 측정: 바닥 인식 중 -->
     <string name="ar_scan_title">카메라를 천천히 움직여 보세요</string>

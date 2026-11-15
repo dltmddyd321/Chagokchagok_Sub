@@ -29,6 +29,9 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
+/** + 를 눌렀는데 점을 찍지 못한 이유 (안내 토스트용) */
+enum class CaptureRejection { NO_SURFACE, TOO_SHORT }
+
 /** 추적이 안 될 때 이유 (안내 문구용) */
 enum class TrackingIssue { INITIALIZING, LOW_LIGHT, FEW_FEATURES, FAST_MOTION, CAMERA }
 
@@ -79,6 +82,8 @@ class ArMeasureRenderer(
     @Suppress("unused") private val shape: MeasureShape = MeasureShape.BOX,
     /** 조준점이 기존 점에 달라붙는 화면 거리 (px) */
     private val snapRadiusPx: Float = 90f,
+    /** 점을 찍지 못했을 때 (GL 스레드에서 불린다) */
+    private val onCaptureRejected: (CaptureRejection) -> Unit = {},
     private val onUpdate: (MeasureUiState) -> Unit,
 ) : GLSurfaceView.Renderer {
 
@@ -101,6 +106,9 @@ class ArMeasureRenderer(
     private var lastUiUpdateMs = 0L
     private var surfaceFoundLatched = false
     private var lostSinceMs: Long? = null
+
+    /** 추적이 잠깐 끊긴 순간 누른 + 는 버리지 않고 잠시 기다렸다 찍는다 (이 시각까지) */
+    private var deferredCaptureUntilMs: Long? = null
 
     /** + 버튼: 조준점 위치에 시작점 또는 끝점 */
     fun captureAtAim() {
@@ -174,7 +182,7 @@ class ArMeasureRenderer(
         while (true) {
             val command = commands.poll() ?: break
             when (command) {
-                Command.Capture -> if (trackingNow) capture(aimPoint)
+                Command.Capture -> if (trackingNow && aimPoint != null) capture(aimPoint) else deferredCaptureUntilMs = now + CAPTURE_RETRY_MS
                 Command.Undo -> undoLast()
                 is Command.Delete -> segments.getOrNull(command.segmentIndex)?.let {
                     it.start.detach()
@@ -195,6 +203,17 @@ class ArMeasureRenderer(
             changed = true
         }
 
+        deferredCaptureUntilMs?.let { until ->
+            if (trackingNow && aimPoint != null) {
+                deferredCaptureUntilMs = null
+                capture(aimPoint)
+                changed = true
+            } else if (now > until) {
+                deferredCaptureUntilMs = null
+                onCaptureRejected(CaptureRejection.NO_SURFACE)
+            }
+        }
+
         if (!changed && now - lastUiUpdateMs < UI_UPDATE_INTERVAL_MS) return
         lastUiUpdateMs = now
 
@@ -209,14 +228,14 @@ class ArMeasureRenderer(
         )
     }
 
-    /** + : 시작점이 없으면 시작점, 있으면 끝점으로 선 완성. 조준점이 없으면(표면 미인식) 무시 */
-    private fun capture(aim: Vec3?) {
-        aim ?: return
+    /** + : 시작점이 없으면 시작점, 있으면 끝점으로 선 완성. 찍지 못하면 이유를 알린다 */
+    private fun capture(aim: Vec3) {
         val start = pendingStart
         if (start == null) {
             pendingStart = anchorAt(aim)
         } else {
-            if ((aim - start.pose.toVec3()).length() < MIN_SEGMENT_M) return
+            // 끝점이 시작점에 달라붙는 등 너무 짧으면 선으로 치지 않는다 → 다시 찍으라고 안내
+            if ((aim - start.pose.toVec3()).length() < MIN_SEGMENT_M) return onCaptureRejected(CaptureRejection.TOO_SHORT)
             segments += Segment(start, anchorAt(aim))
             pendingStart = null
         }
@@ -358,6 +377,9 @@ class ArMeasureRenderer(
 
         /** 추적이 이 시간 넘게 끊겨야 "카메라를 움직여 보세요"를 띄운다 */
         const val TRACKING_LOST_GRACE_MS = 800L
+
+        /** 추적·표면을 잠깐 놓친 순간의 + 를 기다려 주는 시간 */
+        const val CAPTURE_RETRY_MS = 1000L
 
         /** 조준 링 반지름 (m)·선분 수 */
         const val RING_RADIUS_M = 0.035f
