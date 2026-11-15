@@ -36,7 +36,9 @@ class PreviewRequestBuilderTest {
         assertEquals("UNSPECIFIED", items[0].dimensionSource)
         assertNull(items[0].savedItemId)
         assertEquals(0, items[1].requiredQuantity)
-        assertEquals("SAVED_ITEM", items[1].dimensionSource)
+        // 내 물건 id는 기기 전용 → 서버에 보내지 않음
+        assertEquals("UNSPECIFIED", items[1].dimensionSource)
+        assertNull(items[1].savedItemId)
     }
 
     @Test

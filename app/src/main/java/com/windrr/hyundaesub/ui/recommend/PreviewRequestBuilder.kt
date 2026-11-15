@@ -65,9 +65,10 @@ internal object PreviewRequestBuilder {
         heightCm = item.heightCm.toDouble(),
         quantity = item.quantity,
         requiredQuantity = if (item.required) item.quantity else 0,
-        // 등록된 물건에서 불러온 것만 출처를 안다. 나머지(AR·직접 입력 구분 없음)는 기본값
-        dimensionSource = if (item.savedItemId != null) "SAVED_ITEM" else "UNSPECIFIED",
-        savedItemId = item.savedItemId,
+        // 내 물건은 1차에서 기기(Room)에만 저장한다. 그 id를 보내면 서버가 모르는 내 짐이라 422
+        // ("사용할 수 없는 내 짐 ID") → 서버에는 출처·id 없이 치수만 보낸다
+        dimensionSource = "UNSPECIFIED",
+        savedItemId = null,
     )
 
     private const val OCCUPIED = "OCCUPIED"
