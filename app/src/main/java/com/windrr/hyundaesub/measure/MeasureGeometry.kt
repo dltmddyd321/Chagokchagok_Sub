@@ -78,6 +78,34 @@ data class FloorCircle(val center: Vec3, val radius: Float) {
 
 object MeasureGeometry {
 
+    /** 이보다 수직에 가까운 선(길이 대비 세로 성분)을 높이로 본다 */
+    const val VERTICAL_RATIO = 0.7f
+
+    /** 선 하나의 수직 정도: 0 = 바닥과 나란함, 1 = 똑바로 섬 */
+    fun verticalRatio(a: Vec3, b: Vec3): Float {
+        val d = b - a
+        val len = d.length()
+        return if (len == 0f) 0f else kotlin.math.abs(d.y) / len
+    }
+
+    /**
+     * 잰 선들로 가로·세로·높이 정하기 (잰 순서와 무관).
+     * - 높이 = 가장 수직인 선. 수직인 선이 없으면(모두 바닥과 나란히 쟀으면) 가장 짧은 선
+     * - 상자: 남은 두 선 중 긴 쪽 = 가로, 짧은 쪽 = 세로
+     * - 원통: 남은 선 = 지름 (가로·세로에 같이)
+     * [lengthsCm]와 [verticalRatios]는 같은 순서. 선이 모자라면 null
+     */
+    fun assignDimensions(lengthsCm: List<Float>, verticalRatios: List<Float>, shape: MeasureShape): BoxSize? {
+        val needed = if (shape == MeasureShape.CYLINDER) 2 else 3
+        if (lengthsCm.size < needed || verticalRatios.size < needed) return null
+        val indices = (0 until needed).toList()
+        val mostVertical = indices.maxBy { verticalRatios[it] }
+        val heightIndex = if (verticalRatios[mostVertical] >= VERTICAL_RATIO) mostVertical else indices.minBy { lengthsCm[it] }
+        val rest = (indices - heightIndex).map { lengthsCm[it] }.sortedDescending()
+        val height = lengthsCm[heightIndex]
+        return if (shape == MeasureShape.CYLINDER) BoxSize(rest[0], rest[0], height) else BoxSize(rest[0], rest[1], height)
+    }
+
     /** 바닥 위 두 점의 수평 거리 (높이 차는 무시) */
     fun horizontalDistance(a: Vec3, b: Vec3): Float {
         val d = b - a

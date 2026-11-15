@@ -1,3 +1,46 @@
 <resources>
     <string name="app_name">차곡차곡</string>
+
+    <!-- AR 측정: 카메라 권한 -->
+    <string name="ar_permission_title">물건 크기를 재려면\n카메라 권한이 필요해요</string>
+    <string name="ar_permission_body">카메라로 짐을 비추면 가로·세로·높이를 바로 잴 수 있어요.</string>
+    <string name="ar_permission_point_measure">카메라 화면에 선을 그어 크기를 재요</string>
+    <string name="ar_permission_point_only_while">측정하는 동안에만 카메라를 사용해요</string>
+    <string name="ar_permission_denied_title">카메라 권한이 꺼져 있어요</string>
+    <string name="ar_permission_denied_body">설정 &gt; 권한에서 카메라를 허용하면 AR 측정을 쓸 수 있어요. 직접 입력으로도 크기를 넣을 수 있어요.</string>
+    <string name="ar_permission_allow">카메라 권한 허용하기</string>
+    <string name="ar_permission_open_settings">설정에서 권한 허용하기</string>
+    <string name="ar_later">다음에 할게요</string>
+    <string name="ar_back">돌아가기</string>
+
+    <!-- AR 측정: 시작할 수 없을 때 -->
+    <string name="ar_error_unsupported_title">이 기기에서는\nAR 측정을 쓸 수 없어요</string>
+    <string name="ar_error_unsupported_body">직접 입력으로 짐 크기를 넣어 주세요.</string>
+    <string name="ar_error_install_title">AR 측정을 하려면\n설치가 필요해요</string>
+    <string name="ar_error_install_body">Play 스토어에서 ‘Google Play 서비스 AR’을 설치한 뒤 다시 시도해 주세요.</string>
+    <string name="ar_error_start_title">AR 측정을\n시작하지 못했어요</string>
+    <string name="ar_error_start_body">잠시 후 다시 시도해 주세요. 계속 안 되면 직접 입력으로 짐 크기를 넣어 주세요.</string>
+    <string name="ar_error_camera_title">카메라를 열 수 없어요</string>
+    <string name="ar_error_camera_body">다른 앱이 카메라를 쓰고 있다면 닫은 뒤 다시 시도해 주세요.</string>
+
+    <!-- AR 측정: 측정 중 안내 -->
+    <string name="ar_photo_first">대표 사진을 먼저 촬영해 주세요</string>
+    <string name="ar_box_first">가로·세로·높이를 순서 상관없이 재 주세요 (1/3)</string>
+    <string name="ar_box_next">다음 모서리를 재 주세요 (2/3)</string>
+    <string name="ar_box_last">마지막 모서리를 재 주세요 (3/3)</string>
+    <string name="ar_cylinder_first">지름과 높이를 순서 상관없이 재 주세요 (1/2)</string>
+    <string name="ar_cylinder_last">남은 하나를 재 주세요 (2/2)</string>
+    <string name="ar_done">측정이 끝났어요</string>
+    <string name="ar_aim_distance">대상까지 %1$dcm</string>
+    <string name="ar_toast_start_point">시작 지점을 추가했어요</string>
+    <string name="ar_toast_end_point">끝 지점을 추가했어요</string>
+    <string name="ar_toast_photo">사진을 찍었어요</string>
+
+    <!-- AR 측정: 바닥 인식 중 -->
+    <string name="ar_scan_title">카메라를 천천히 움직여 보세요</string>
+    <string name="ar_scan_initializing">바닥과 짐 주변을 비추면 곧 측정을 시작할 수 있어요</string>
+    <string name="ar_scan_low_light">너무 어두워요. 조명을 켜 주세요</string>
+    <string name="ar_scan_few_features">무늬가 있는 바닥이나 짐 주변을 비춰 주세요</string>
+    <string name="ar_scan_fast_motion">조금 더 천천히 움직여 주세요</string>
+    <string name="ar_scan_camera">카메라를 쓸 수 없어요. 다른 앱을 닫아 주세요</string>
 </resources>

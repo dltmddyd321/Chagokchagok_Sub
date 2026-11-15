@@ -1,6 +1,12 @@
 package com.windrr.hyundaesub.measure
 
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import android.util.Log
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.border
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.withContext
@@ -110,24 +116,62 @@ fun ArMeasureScreen(
     shape: MeasureShape = MeasureShape.BOX,
 ) {
     val context = LocalContext.current
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED,
-        )
+    val activity = context as Activity
+    fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    var hasCameraPermission by remember { mutableStateOf(granted()) }
+    // 두 번 거절해 시스템 창이 더 뜨지 않는 상태 → 설정으로 안내
+    var permanentlyDenied by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        hasCameraPermission = ok
+        if (!ok) permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCameraPermission = it
-    }
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    // 설정에서 허용하고 돌아오면 바로 측정 화면으로
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && !hasCameraPermission && granted()) hasCameraPermission = true
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     BackHandler(onBack = onBack)
 
-    if (hasCameraPermission) {
-        ArMeasureContent(onBack, onMeasured, shape)
-    } else {
-        MessageScreen("물건을 재려면 카메라 권한이 필요해요.", onBack)
+    when {
+        hasCameraPermission -> ArMeasureContent(onBack, onMeasured, shape)
+        permanentlyDenied -> MeasureNoticeScreen(
+            title = stringResource(R.string.ar_permission_denied_title),
+            body = stringResource(R.string.ar_permission_denied_body),
+            primaryText = stringResource(R.string.ar_permission_open_settings),
+            onPrimary = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                )
+            },
+            onBack = onBack,
+            secondaryText = stringResource(R.string.ar_later),
+        )
+        // 시스템 권한 창 전에 왜 필요한지 먼저 보여 준다
+        else -> MeasureNoticeScreen(
+            title = stringResource(R.string.ar_permission_title),
+            body = stringResource(R.string.ar_permission_body),
+            primaryText = stringResource(R.string.ar_permission_allow),
+            onPrimary = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+            onBack = onBack,
+            secondaryText = stringResource(R.string.ar_later),
+            points = listOf(
+                stringResource(R.string.ar_permission_point_measure),
+                stringResource(R.string.ar_permission_point_only_while),
+            ),
+        )
     }
+}
+
+/** AR을 시작할 수 없을 때 안내 (제목·본문 문자열 리소스) */
+private enum class MeasureError(@StringRes val title: Int, @StringRes val body: Int) {
+    UNSUPPORTED(R.string.ar_error_unsupported_title, R.string.ar_error_unsupported_body),
+    INSTALL_DECLINED(R.string.ar_error_install_title, R.string.ar_error_install_body),
+    START_FAILED(R.string.ar_error_start_title, R.string.ar_error_start_body),
+    CAMERA(R.string.ar_error_camera_title, R.string.ar_error_camera_body),
 }
 
 @Composable
@@ -152,7 +196,7 @@ private fun ArMeasureContent(
     val snapRadiusPx = with(LocalDensity.current) { 30.dp.toPx() }
     val trashRadiusPx = with(LocalDensity.current) { 22.dp.toPx() }
     var uiState by remember { mutableStateOf(MeasureUiState()) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<MeasureError?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         var session: Session? = null
@@ -192,13 +236,15 @@ private fun ArMeasureContent(
                     renderer = r
                 }
             } catch (e: UnavailableDeviceNotCompatibleException) {
-                error = "이 기기는 AR 측정을 지원하지 않아요."
+                error = MeasureError.UNSUPPORTED
                 null
             } catch (e: UnavailableUserDeclinedInstallationException) {
-                error = "AR 측정을 쓰려면 'Google Play 서비스 AR' 설치가 필요해요."
+                error = MeasureError.INSTALL_DECLINED
                 null
             } catch (e: UnavailableException) {
-                error = "AR을 시작할 수 없어요. (${e.javaClass.simpleName})"
+                // 예외 이름은 사용자에게 보이지 않게 로그로만
+                Log.w(TAG, "AR 세션 시작 실패", e)
+                error = MeasureError.START_FAILED
                 null
             }
         }
@@ -212,7 +258,7 @@ private fun ArMeasureContent(
                             it.resume()
                             glView.onResume()
                         } catch (e: CameraNotAvailableException) {
-                            error = "카메라를 열 수 없어요. 다른 앱이 카메라를 쓰고 있는지 확인해 주세요."
+                            error = MeasureError.CAMERA
                         }
                     }
                 }
@@ -237,7 +283,13 @@ private fun ArMeasureContent(
     }
 
     error?.let {
-        MessageScreen(it, onBack)
+        MeasureNoticeScreen(
+            title = stringResource(it.title),
+            body = stringResource(it.body),
+            primaryText = stringResource(R.string.ar_back),
+            onPrimary = onBack,
+            onBack = onBack,
+        )
         return
     }
 
@@ -250,7 +302,7 @@ private fun ArMeasureContent(
     val pointCount = uiState.segments.size * 2 + if (uiState.waitingEnd) 1 else 0
     LaunchedEffect(pointCount) {
         if (pointCount > lastPointCount) {
-            toast = if (uiState.waitingEnd) "시작 지점을 추가했어요." else "끝 지점을 추가했어요."
+            toast = context.getString(if (uiState.waitingEnd) R.string.ar_toast_start_point else R.string.ar_toast_end_point)
             toastKey++
         }
         lastPointCount = pointCount
@@ -271,7 +323,7 @@ private fun ArMeasureContent(
         renderer?.capturePhoto { bitmap ->
             scope.launch {
                 lastPhotoUri = withContext(Dispatchers.IO) { savePhoto(context, bitmap) }
-                toast = "사진을 찍었어요."
+                toast = context.getString(R.string.ar_toast_photo)
                 toastKey++
             }
         }
@@ -284,15 +336,13 @@ private fun ArMeasureContent(
         }
     }
 
-    // 크기 측정 버튼으로 필요한 선을 다 재면 다음 화면으로
-    val needed = if (shape == MeasureShape.CYLINDER) 2 else 3
+    // 크기 측정 버튼으로 필요한 선을 다 재면 다음 화면으로.
+    // 가로·세로·높이는 잰 순서가 아니라 선 방향으로 정한다 (가장 수직인 선 = 높이)
     LaunchedEffect(uiState.lengthsCm.size, uiState.waitingEnd) {
-        val l = uiState.lengthsCm
-        if (!uiState.waitingEnd && l.size >= needed) {
-            delay(400) // 마지막 선이 그려지는 걸 잠깐 보여주고
-            val size = if (shape == MeasureShape.CYLINDER) BoxSize(l[0], l[0], l[1]) else BoxSize(l[0], l[1], l[2])
-            onMeasured(size, lastPhotoUri)
-        }
+        if (uiState.waitingEnd) return@LaunchedEffect
+        val size = MeasureGeometry.assignDimensions(uiState.lengthsCm, uiState.verticalRatios, shape) ?: return@LaunchedEffect
+        delay(400) // 마지막 선이 그려지는 걸 잠깐 보여주고
+        onMeasured(size, lastPhotoUri)
     }
 
     Box(
@@ -328,7 +378,7 @@ private fun ArMeasureContent(
         if (!scanning) {
             uiState.aimDistanceCm?.let { cm ->
                 Text(
-                    text = "대상까지 ${cm}cm",
+                    text = stringResource(R.string.ar_aim_distance, cm),
                     color = Color.White,
                     fontSize = 12.sp,
                     modifier = Modifier
@@ -347,7 +397,7 @@ private fun ArMeasureContent(
         // 상단 안내: 대표 사진을 찍기 전에는 사진 안내(인식 중에도 표시), 찍은 뒤에는 잴 치수 안내
         if (lastPhotoUri == null) {
             TopHint(
-                text = "대표 사진을 먼저 촬영해 주세요.",
+                text = stringResource(R.string.ar_photo_first),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
@@ -432,17 +482,24 @@ private fun ArMeasureContent(
     }
 }
 
-/** 잰 선이 무엇인지 알려주는 상단 안내 (첫 선 = 가로, 둘째 = 세로, 셋째 = 높이) */
+/** 몇 번째 선을 잴 차례인지 알려주는 상단 안내 */
 @Composable
 private fun DimensionHint(measuredCount: Int, shape: MeasureShape, modifier: Modifier = Modifier) {
-    val names = if (shape == MeasureShape.CYLINDER) listOf("지름", "지름", "높이") else listOf("가로", "세로", "높이")
-    val text = when {
-        shape == MeasureShape.CYLINDER && measuredCount == 0 -> "먼저 지름을 재 주세요"
-        shape == MeasureShape.CYLINDER && measuredCount == 1 -> "이어서 높이를 재 주세요 (지름은 가로·세로에 같이 들어가요)"
-        measuredCount < 3 -> "${names[measuredCount]}를 재 주세요 (${measuredCount + 1}/3)"
-        else -> "측정이 끝났어요"
+    // 어느 선이 높이인지는 방향으로 정하므로 순서는 묻지 않는다
+    val text = when (shape) {
+        MeasureShape.CYLINDER -> when (measuredCount) {
+            0 -> R.string.ar_cylinder_first
+            1 -> R.string.ar_cylinder_last
+            else -> R.string.ar_done
+        }
+        else -> when (measuredCount) {
+            0 -> R.string.ar_box_first
+            1 -> R.string.ar_box_next
+            2 -> R.string.ar_box_last
+            else -> R.string.ar_done
+        }
     }
-    TopHint(text = text, modifier = modifier)
+    TopHint(text = stringResource(text), modifier = modifier)
 }
 
 /** 상단 반투명 안내 칩 */
@@ -471,13 +528,16 @@ private fun ScanningGuide(issue: TrackingIssue?, modifier: Modifier = Modifier) 
         animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
         label = "scanShift",
     )
-    val detail = when (issue) {
-        TrackingIssue.LOW_LIGHT -> "너무 어두워요. 조명을 켜 주세요"
-        TrackingIssue.FEW_FEATURES -> "무늬가 있는 바닥이나 물건 주변을 비춰 주세요"
-        TrackingIssue.FAST_MOTION -> "조금 더 천천히 움직여 주세요"
-        TrackingIssue.CAMERA -> "카메라를 쓸 수 없어요. 다른 앱을 닫아 주세요"
-        else -> null
-    }
+    val detail = stringResource(
+        when (issue) {
+            TrackingIssue.LOW_LIGHT -> R.string.ar_scan_low_light
+            TrackingIssue.FEW_FEATURES -> R.string.ar_scan_few_features
+            TrackingIssue.FAST_MOTION -> R.string.ar_scan_fast_motion
+            TrackingIssue.CAMERA -> R.string.ar_scan_camera
+            // 준비 중·이유를 모를 때도 할 일을 알려 준다
+            TrackingIssue.INITIALIZING, null -> R.string.ar_scan_initializing
+        },
+    )
     Column(modifier = modifier.padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Canvas(modifier = Modifier.size(width = 170.dp, height = 70.dp)) {
             val w = size.width
@@ -502,11 +562,9 @@ private fun ScanningGuide(issue: TrackingIssue?, modifier: Modifier = Modifier) 
             )
         }
         Spacer(Modifier.height(20.dp))
-        Text(text = "카메라를 움직여 보세요", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        detail?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(text = it, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, textAlign = TextAlign.Center)
-        }
+        Text(text = stringResource(R.string.ar_scan_title), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text(text = detail, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -649,18 +707,4 @@ private fun DrawScope.drawPill(text: String, at: Offset, dir: Offset, background
 private val DarkText = Color(0xFF05082B)
 private val PreviewYellow = Color(0xFFE6F53A)
 
-@Composable
-private fun MessageScreen(message: String, onBack: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(message, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = onBack) { Text("돌아가기") }
-    }
-}
+private const val TAG = "ArMeasure"

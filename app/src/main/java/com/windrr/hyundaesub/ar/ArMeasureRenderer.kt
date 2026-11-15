@@ -60,6 +60,8 @@ data class MeasureUiState(
     val previewLine: PreviewLine? = null,
     /** 확정된 선 길이 (cm, 찍은 순서) */
     val lengthsCm: List<Float> = emptyList(),
+    /** 확정된 선의 수직 정도 (0~1, [lengthsCm]와 같은 순서) → 높이 판정 */
+    val verticalRatios: List<Float> = emptyList(),
 )
 
 /**
@@ -298,11 +300,13 @@ class ArMeasureRenderer(
     ): MeasureUiState {
         val screenSegments = mutableListOf<ScreenSegment>()
         val lengths = mutableListOf<Float>()
+        val verticals = mutableListOf<Float>()
         segments.forEach { seg ->
             val a = seg.start.pose.toVec3()
             val b = seg.end.pose.toVec3()
             val cm = (b - a).length() * 100f
             lengths += cm
+            verticals += MeasureGeometry.verticalRatio(a, b)
             val from = project(a)
             val to = project(b)
             if (from != null && to != null) {
@@ -332,6 +336,7 @@ class ArMeasureRenderer(
             points = allPoints().mapNotNull(project),
             previewLine = preview,
             lengthsCm = lengths,
+            verticalRatios = verticals,
         )
     }
 
