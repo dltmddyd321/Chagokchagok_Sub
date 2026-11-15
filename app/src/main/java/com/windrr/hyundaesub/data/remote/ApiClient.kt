@@ -12,10 +12,13 @@ object ApiClient {
 
     private const val TIMEOUT_SECONDS = 20L
 
+    /** 응답 대기: 제품 검색(웹 검색+AI)·배치 계산·AI 가이드는 서버에서 20초 넘게 걸리기도 한다 (2026-11-15 제품 검색 약 20초) */
+    private const val READ_TIMEOUT_SECONDS = 60L
+
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             // 서버 전체가 Basic 인증. 계정은 local.properties → BuildConfig
             .apply {
