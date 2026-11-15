@@ -82,9 +82,9 @@ internal object ArrangementLayoutMapper {
             .mapNotNull { placement ->
                 val space = spaces[placement.spaceId] ?: return@mapNotNull null
                 val item = itemsById[placement.itemId] ?: return@mapNotNull null
-                val area = spaceRect(space) ?: return@mapNotNull null
                 val (extentX, extentY) = footprint(item, placement.orientation)
-                val rect = toImageRect(area, space, placement.xCm, placement.yCm, extentX, extentY)
+                val rect = cargoRect(space, placement.xCm, placement.yCm, extentX, extentY)
+                    ?: toImageRect(spaceRect(space) ?: return@mapNotNull null, space, placement.xCm, placement.yCm, extentX, extentY)
                 ItemBox(placement.placementId, item.name?.takeIf { it.isNotBlank() } ?: "짐", 0, rect, space.kind)
             }
             .mapIndexed { index, box -> box.copy(order = index) }
@@ -120,19 +120,43 @@ internal object ArrangementLayoutMapper {
         return dim(axes[0]) to dim(axes[1])
     }
 
-    /** 공간 안 위치(cm) → 이미지 px. 공간 밖으로 나가는 값은 공간 경계로 자른다 */
     /**
-     * 공간 안 위치(cm) → 이미지 px. **가로·세로 같은 축척**으로 그려 짐 모양이 실제 비율 그대로 보이게 한다.
-     * 탑뷰 이미지의 트렁크 칸은 실제(123×100cm)보다 납작해서(가로 5.3px/cm, 세로 2.4px/cm)
-     * 칸에 맞춰 늘리면 냉장고·전자레인지가 옆으로 길쭉해 보였다.
-     * - 축척 = 칸에 들어가는 가장 큰 값 (트렁크는 2열 좌석 표시칸 바로 아래까지 위로 써도 된다)
-     * - 공간은 칸 가운데, 뒤(y=0)는 칸 아래(트렁크 입구)에 맞춘다
+     * 트렁크·접은 2열에 놓인 짐 → 이미지 px. 적재 탑뷰(img_vehicle_tucson_cargo_view)는 트렁크·2열을 실제 비율로 늘린 그림이라
+     * 공간의 차량 좌표(origin_cm)에 짐 위치를 더해 **한 축척**([VehicleTopView.PX_PER_CM])으로 그대로 옮긴다.
+     * 짐이 트렁크에서 접은 2열까지 걸쳐 있으면 그림에서도 그만큼 걸쳐 보인다.
+     * 차량 좌표가 없거나 이 그림 밖 공간(펴진 좌석, 1열 등)이면 null → [toImageRect]
+     */
+    fun cargoRect(space: PackingSpaceResponse, xCm: Double, yCm: Double, extentX: Double, extentY: Double): PxRect? {
+        val origin = space.originCm ?: return null
+        val inCargo = when (space.kind) {
+            KIND_TRUNK -> true
+            KIND_FOLDED_SEAT -> space.seatCodes.orEmpty().isNotEmpty() && space.seatCodes.orEmpty().all { it.startsWith("ROW_2_") }
+            else -> false
+        }
+        if (!inCargo) return null
+        val s = VehicleTopView.PX_PER_CM
+        val x0 = (origin.xCm + xCm).coerceIn(0.0, VehicleTopView.CARGO_WIDTH_CM)
+        val x1 = (origin.xCm + xCm + extentX).coerceIn(0.0, VehicleTopView.CARGO_WIDTH_CM)
+        val y0 = (origin.yCm + yCm).coerceIn(0.0, VehicleTopView.CARGO_DEPTH_CM)
+        val y1 = (origin.yCm + yCm + extentY).coerceIn(0.0, VehicleTopView.CARGO_DEPTH_CM)
+        val left = VehicleTopView.TRUNK.left
+        val bottom = VehicleTopView.TRUNK.bottom
+        return PxRect(
+            left = (left + x0 * s).toFloat(),
+            right = (left + x1 * s).toFloat(),
+            top = (bottom - y1 * s).toFloat(),
+            bottom = (bottom - y0 * s).toFloat(),
+        )
+    }
+
+    /**
+     * 공간 안 위치(cm) → 이미지 px (차량 좌표로 못 옮기는 공간). 가로·세로 같은 축척으로 칸 가운데에 그린다.
+     * 공간 밖으로 나가는 값은 공간 경계로 자른다. y=0(뒤)이 칸 아래.
      */
     fun toImageRect(area: PxRect, space: PackingSpaceResponse, xCm: Double, yCm: Double, extentX: Double, extentY: Double): PxRect {
         val w = space.widthCm.takeIf { it > 0 } ?: 1.0
         val d = space.depthCm.takeIf { it > 0 } ?: 1.0
-        val usableHeight = if (space.kind == KIND_TRUNK) area.bottom - VehicleTopView.TRUNK_MAX_TOP else area.height
-        val scale = minOf(area.width / w, usableHeight / d)
+        val scale = minOf(area.width / w, area.height / d)
         val drawLeft = area.left + (area.width - w * scale) / 2
         val x0 = xCm.coerceIn(0.0, w)
         val x1 = (xCm + extentX).coerceIn(0.0, w)
@@ -141,7 +165,6 @@ internal object ArrangementLayoutMapper {
         return PxRect(
             left = (drawLeft + x0 * scale).toFloat(),
             right = (drawLeft + x1 * scale).toFloat(),
-            // y=0(뒤)이 이미지 아래
             top = (area.bottom - y1 * scale).toFloat(),
             bottom = (area.bottom - y0 * scale).toFloat(),
         )
@@ -155,18 +178,26 @@ internal object ArrangementLayoutMapper {
 }
 
 /**
- * img_vehicle_tucson_top_view (976×1612px, drawable-nodpi, 위가 차 앞) 위 영역. 단위 원본 px.
- * 좌석 중심은 좌석 선택 화면과 같은 값.
+ * img_vehicle_tucson_cargo_view (976×1957px, drawable-nodpi, 위가 차 앞) 위 영역. 단위 원본 px.
+ * 원본 탑뷰(img_vehicle_tucson_top_view, 976×1612)에서 2열(905~1162px)과 트렁크(1162~1405px)만 세로로 늘려
+ * 트렁크 123×100cm, 접은 2열 60cm를 가로와 같은 축척(650px/123cm ≈ 5.28px/cm)으로 맞춘 그림이다.
  */
 internal object VehicleTopView {
     const val IMAGE_W = 976
-    const val IMAGE_H = 1612
+    const val IMAGE_H = 1957
 
     /** 추천 화면에 보여줄 영역: 앞좌석 위 ~ 뒤 범퍼(TUCSON 글자) */
     const val CROP_LEFT = 0
     const val CROP_TOP = 520
     const val CROP_W = 976
-    const val CROP_H = 998
+    const val CROP_H = 1343
+
+    /** 트렁크·2열 적재 공간 축척 (가로·세로 같음) */
+    const val PX_PER_CM = 650.0 / 123.0
+
+    /** 차량 좌표로 그리는 범위: 트렁크 폭 123cm, 깊이 트렁크 100 + 접은 2열 60cm */
+    const val CARGO_WIDTH_CM = 123.0
+    const val CARGO_DEPTH_CM = 160.0
 
     /** "탑승"/"좌석" 표시칸 크기 */
     private const val MARK_PX = 170f
@@ -174,34 +205,31 @@ internal object VehicleTopView {
     private val SEAT_CENTERS = mapOf(
         SeatCode.ROW_1_LEFT to (322f to 625f),
         SeatCode.ROW_1_RIGHT to (668f to 625f),
-        SeatCode.ROW_2_LEFT to (305f to 990f),
-        SeatCode.ROW_2_CENTER to (492f to 990f),
-        SeatCode.ROW_2_RIGHT to (680f to 990f),
+        SeatCode.ROW_2_LEFT to (305f to 1010f),
+        SeatCode.ROW_2_CENTER to (492f to 1010f),
+        SeatCode.ROW_2_RIGHT to (680f to 1010f),
     )
 
     /** 좌석 방석 (펴진 좌석 위에 짐을 놓을 때) */
     private val CUSHIONS = mapOf(
         SeatCode.ROW_1_LEFT to PxRect(210f, 550f, 440f, 700f),
         SeatCode.ROW_1_RIGHT to PxRect(560f, 550f, 790f, 700f),
-        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 425f, 1075f),
-        SeatCode.ROW_2_CENTER to PxRect(432f, 905f, 552f, 1075f),
-        SeatCode.ROW_2_RIGHT to PxRect(558f, 905f, 805f, 1075f),
+        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 425f, 1115f),
+        SeatCode.ROW_2_CENTER to PxRect(432f, 905f, 552f, 1115f),
+        SeatCode.ROW_2_RIGHT to PxRect(558f, 905f, 805f, 1115f),
     )
 
-    /** 접은 좌석: 방석 + 접혀 눕는 등받이까지 */
+    /** 접은 좌석: 방석 + 접혀 눕는 등받이까지 (2열은 트렁크 바닥 바로 위까지) */
     private val FOLDED = mapOf(
         SeatCode.ROW_1_LEFT to PxRect(210f, 550f, 440f, 830f),
         SeatCode.ROW_1_RIGHT to PxRect(560f, 550f, 790f, 830f),
-        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 428f, 1150f),
-        SeatCode.ROW_2_CENTER to PxRect(428f, 905f, 555f, 1150f),
-        SeatCode.ROW_2_RIGHT to PxRect(555f, 905f, 805f, 1150f),
+        SeatCode.ROW_2_LEFT to PxRect(185f, 905f, 428f, 1222f),
+        SeatCode.ROW_2_CENTER to PxRect(428f, 905f, 555f, 1222f),
+        SeatCode.ROW_2_RIGHT to PxRect(555f, 905f, 805f, 1222f),
     )
 
-    /** 트렁크 바닥 */
-    val TRUNK = PxRect(175f, 1162f, 825f, 1405f)
-
-    /** 트렁크 짐을 실제 비율로 그릴 때 위로 써도 되는 한계 (2열 시트 아래 끝에 거의 닿는 곳) */
-    const val TRUNK_MAX_TOP = 1110f
+    /** 트렁크 바닥 123×100cm (아래가 트렁크 입구 = 차량 좌표 y 0) */
+    val TRUNK = PxRect(175f, 1222f, 825f, 1750f)
 
     fun seatMarkRect(seat: SeatCode): PxRect {
         val (cx, cy) = SEAT_CENTERS.getValue(seat)

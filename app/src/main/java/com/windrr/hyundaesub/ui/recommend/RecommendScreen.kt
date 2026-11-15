@@ -299,7 +299,7 @@ internal fun ArrangementView(
     onOpenGuide: (() -> Unit)? = null,
 ) {
     val isGuide = guideSteps != null
-    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_tucson_top_view)
+    val image = ImageBitmap.imageResource(R.drawable.img_vehicle_tucson_cargo_view)
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()

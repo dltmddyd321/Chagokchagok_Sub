@@ -7,81 +7,88 @@ import com.windrr.hyundaesub.data.remote.model.PlacementResponse
 import com.windrr.hyundaesub.data.remote.model.SnapshotItem
 import com.windrr.hyundaesub.data.remote.model.SpaceOriginResponse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 실서버 응답(아반떼 데모, 뒷좌석 왼쪽 접기 배치)을 줄여 옮긴 값으로 검증 */
+/** 실서버 응답(투싼 하이브리드, 2열 모두 접기: 책상을 옆으로 눕혀 트렁크~접은 2열에 걸침)을 옮긴 값으로 검증 */
 class ArrangementLayoutMapperTest {
 
-    private val trunk = PackingSpaceResponse("TRUNK", "TRUNK", 97.0, 110.0, 50.0, SpaceOriginResponse(0.0, 0.0, 0.0), emptyList())
-    private val rearLeftFolded = PackingSpaceResponse(
-        "REAR_LEFT_FOLDED", "FOLDED_SEAT", 61.0, 60.0, 50.0, SpaceOriginResponse(0.0, 110.0, 0.0), listOf("ROW_2_LEFT", "ROW_2_CENTER"),
-    )
-    private val rearRight = PackingSpaceResponse(
-        "REAR_RIGHT_SEAT", "SEAT", 30.0, 40.0, 55.0, SpaceOriginResponse(62.0, 110.0, 0.0), listOf("ROW_2_RIGHT"),
+    private val trunk = PackingSpaceResponse("TRUNK", "TRUNK", 123.0, 100.0, 80.0, SpaceOriginResponse(0.0, 0.0, 0.0), emptyList())
+    private val rearFolded = PackingSpaceResponse(
+        "REAR_FOLDED", "FOLDED_SEAT", 116.0, 60.0, 70.0, SpaceOriginResponse(3.5, 100.0, 0.0),
+        listOf("ROW_2_LEFT", "ROW_2_CENTER", "ROW_2_RIGHT"),
     )
     private val items = listOf(
-        SnapshotItem("big", "큰박스", 90.0, 100.0, 40.0, 1),
-        SnapshotItem("long", "긴박스", 55.0, 55.0, 40.0, 1),
+        SnapshotItem("desk", "책상", 120.0, 60.0, 73.0, 1),
+        SnapshotItem("box", "짐 2", 60.0, 40.0, 35.0, 1),
     )
     private val arrangement = ArrangementResponse(
         arrangementId = "arr1",
         rank = 1,
-        passengerSeats = listOf("ROW_1_LEFT"),
-        targetFoldedSegments = listOf("DEMO_REAR_LEFT"),
-        packingSpaces = listOf(trunk, rearLeftFolded, rearRight),
+        passengerSeats = listOf("ROW_1_LEFT", "ROW_1_RIGHT"),
+        targetFoldedSegments = listOf("REAR_ALL"),
+        packingSpaces = listOf(trunk, rearFolded),
         placements = listOf(
             // 순서 섞어서 보냄 → load_order대로 정렬돼야 함
-            PlacementResponse("p2", "long", 1, "REAR_LEFT_FOLDED", 0.0, 0.0, 0.0, "WDH", 2),
-            PlacementResponse("p1", "big", 1, "TRUNK", 0.0, 0.0, 0.0, "WDH", 1),
+            PlacementResponse("p2", "box", 1, "REAR_FOLDED", 0.0, 20.0, 0.0, "WDH", 2),
+            PlacementResponse("p1", "desk", 1, "TRUNK", 3.5, 0.0, 0.0, "HWD", 1),
         ),
         allInTrunk = false,
         reasonCodes = emptyList(),
     )
 
     private val layout = ArrangementLayoutMapper.map(arrangement, items)
+    private val s = VehicleTopView.PX_PER_CM.toFloat()
 
     @Test
     fun items_inLoadOrder() {
-        assertEquals(listOf("큰박스", "긴박스"), layout.items.map { it.name })
+        assertEquals(listOf("책상", "짐 2"), layout.items.map { it.name })
         assertEquals(listOf(0, 1), layout.items.map { it.order })
     }
 
     @Test
     fun foldedSeats_haveNoSeatBox_otherSeatsKeepBox() {
         val marks = layout.seats.associate { it.seat to it.mark }
-        assertEquals(
-            mapOf(SeatCode.ROW_1_RIGHT to SeatMark.EMPTY_SEAT, SeatCode.ROW_2_RIGHT to SeatMark.EMPTY_SEAT),
-            marks,
-        )
+        assertEquals(mapOf(SeatCode.ROW_1_RIGHT to SeatMark.BOARDING), marks)
     }
 
     @Test
     fun foldedGroups_andSpaceKind() {
-        assertEquals(listOf(listOf(SeatCode.ROW_2_LEFT, SeatCode.ROW_2_CENTER)), layout.foldedGroups.map { it.seats })
+        assertEquals(listOf(listOf(SeatCode.ROW_2_LEFT, SeatCode.ROW_2_CENTER, SeatCode.ROW_2_RIGHT)), layout.foldedGroups.map { it.seats })
         assertEquals(listOf("TRUNK", "FOLDED_SEAT"), layout.items.map { it.spaceKind })
     }
 
     @Test
-    fun trunkItem_keepsRealProportion_andStartsAtRearCorner() {
-        val rect = layout.items[0].rect // 90 × 100 cm, 트렁크 97 × 110 cm 왼쪽 뒤 구석
+    fun trunkItem_drawnAtVehicleScale_andSpansIntoFoldedSeats() {
+        val rect = layout.items[0].rect // 옆으로 눕힌 책상: 바닥 73 × 120 cm, 왼쪽 벽(x 3.5)에서 트렁크 입구부터
         val trunkRect = VehicleTopView.TRUNK
-        // 가로·세로 같은 축척 → 화면 비율 = 실제 비율
-        assertEquals(90f / 100f, rect.width / rect.height, 0.01f)
-        // 뒤(y=0)는 트렁크 입구 쪽 아래
-        assertEquals(trunkRect.bottom, rect.bottom, 0.01f)
-        // 위로는 2열 좌석 표시칸 아래까지만
-        assertTrue(rect.top >= VehicleTopView.TRUNK_MAX_TOP - 0.5f)
-        // 공간이 가운데 정렬되어 왼쪽 끝은 칸 안쪽
-        assertTrue(rect.left >= trunkRect.left)
+        assertEquals(73f * s, rect.width, 0.5f)
+        assertEquals(120f * s, rect.height, 0.5f)
+        assertEquals(trunkRect.left + 3.5f * s, rect.left, 0.5f)
+        assertEquals(trunkRect.bottom, rect.bottom, 0.5f)
+        // 트렁크 깊이(100cm)를 넘는 20cm는 접은 2열 위로
+        assertTrue(rect.top < trunkRect.top)
     }
 
     @Test
-    fun foldedSeatItem_staysInsideFoldedArea() {
-        val area = ArrangementLayoutMapper.spaceRect(rearLeftFolded)!!
-        val rect = layout.items[1].rect
-        assertTrue(rect.left >= area.left && rect.right <= area.right)
-        assertTrue(rect.top >= area.top && rect.bottom <= area.bottom)
+    fun foldedSeatItem_continuesFromTrunkAtSameScale() {
+        val desk = layout.items[0].rect
+        val box = layout.items[1].rect // 접은 2열 왼쪽, 책상 바로 앞 (차량 좌표 y 120~160)
+        assertEquals(60f * s, box.width, 0.5f)
+        assertEquals(40f * s, box.height, 0.5f)
+        assertEquals(desk.top, box.bottom, 0.5f)
+        assertEquals(desk.left, box.left, 0.5f)
+    }
+
+    @Test
+    fun unfoldedSeat_fallsBackToSeatArea() {
+        val seat = PackingSpaceResponse("REAR_RIGHT_SEAT", "SEAT", 30.0, 40.0, 55.0, SpaceOriginResponse(80.0, 100.0, 0.0), listOf("ROW_2_RIGHT"))
+        assertNull(ArrangementLayoutMapper.cargoRect(seat, 0.0, 0.0, 30.0, 40.0))
+        val area = ArrangementLayoutMapper.spaceRect(seat)!!
+        val rect = ArrangementLayoutMapper.toImageRect(area, seat, 0.0, 0.0, 30.0, 40.0)
+        assertTrue(rect.left >= area.left - 0.5f && rect.right <= area.right + 0.5f)
+        assertTrue(rect.top >= area.top - 0.5f && rect.bottom <= area.bottom + 0.5f)
     }
 
     @Test
