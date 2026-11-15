@@ -52,7 +52,7 @@
 | API | 서브앱 | Pleos 앱 | 쓰는 곳 / 메모 |
 |---|---|---|---|
 | `POST /api/v1/plans/{plan_id}/calculations` | 🟡 | 🟡 | **이미 저장된 계획**을 다시 계산할 때만. 새 계획은 `calculations/preview` → `POST /plans`. 모델이 옛 형식 |
-| `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | ⬜ | |
+| `GET /api/v1/plans/{plan_id}/calculations/{calculation_id}` | ⬜ | 🔌 | Pleos 내 계획 "배치도 미리보기": 계획의 `selected_calculation_id`(없으면 `latest_calculation_id`)로 조회 → `selected_arrangement_id` 배치를 탑뷰로 |
 | `POST /api/v1/calculations/preview` | 🔌 | 🔌 | 서브앱 짐 선택 "배치 추천받기" → 배치 추천 화면. `vehicle_state.seats`에 좌석 선택 결과(OCCUPIED/EMPTY, USER)를 꼭 넣어야 좌석·접은 좌석을 씀(없으면 `STATE_REQUIRED`). 2026-11-14 curl로 응답 구조 확인, 앱 실호출 테스트 `PreviewApiLiveTest` 작성(미실행) / Pleos "적재 가능 여부 확인" → 적재 결과 화면: 인원 수만 보내고 `passenger_seats` 생략(서버가 자리 지정), 전 좌석 EMPTY로 보내야 좌석·접은 좌석 사용 (2026-11-15 curl 확인) |
 
 ### 내 짐
@@ -85,12 +85,13 @@
 | | 서브앱 | Pleos 앱 |
 |---|---|---|
 | ✅ 연결·호출 확인 | 2 (`GET /plans`, `PUT /notifications/devices`) | 0 |
-| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 7 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`) |
+| 🔌 연결만 | 4 (`POST /calculations/preview`, `POST /ai/loading-guides`, `POST /plans`, `PATCH /plans/{id}/metadata`) | 8 (`GET /plans`, `GET /plans/{id}`, `POST /cargo-reminders`, `POST /products/search`, `POST /calculations/preview`, `POST /ai/loading-guides`, `PUT /plans/{id}`, `GET /plans/{id}/calculations/{calc_id}`) |
 | 🟡 등록만 | 2 (`POST /plans/{id}/calculations`, `DELETE /notifications/devices`) | 2 (`POST /plans`, `POST /plans/{id}/calculations`) |
-| ⬜ 남음 | 13 | 8 |
+| ⬜ 남음 | 13 | 7 |
 | ➖ 안 씀 | 1 | 5 |
 
 ## 변경 기록
+- 2026-11-15: Pleos 배치도 미리보기 (`GET /plans/{id}/calculations/{calc_id}`).
 - 2026-11-15: Pleos 내 계획 상세 + `PUT /plans/{id}`로 짐·동승자 수정 저장.
 - 2026-11-15: Pleos 빠른 확인(제품 검색 → 기기 DB 실측으로 들어가는지 판정).
 - 2026-11-15: X-Notification-Key 받음 → 기기 등록·해제 실호출 200, 짐 챙기기 알림 인증 통과.
