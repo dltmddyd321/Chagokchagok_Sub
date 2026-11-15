@@ -79,6 +79,8 @@ dependencies {
     implementation(libs.firebase.messaging)
 
     implementation(libs.arcore)
+    // 짐 사진 (AR로 찍은 사진·갤러리 사진)
+    implementation(libs.coil.compose)
     // 글래스모피즘 하단 탭바 (실블러 API 31+, 미만은 반투명 폴백)
     implementation(libs.haze)
     testImplementation(libs.junit)

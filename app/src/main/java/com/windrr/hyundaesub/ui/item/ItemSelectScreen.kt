@@ -151,6 +151,7 @@ fun ItemSelectScreen(
             items(pickedItems, key = { it.key }) { item ->
                 ItemCard(
                     name = item.name,
+                    photoUri = item.photoUri,
                     sizeLabel = item.sizeLabel,
                     checked = item.selected,
                     quantity = item.quantity,

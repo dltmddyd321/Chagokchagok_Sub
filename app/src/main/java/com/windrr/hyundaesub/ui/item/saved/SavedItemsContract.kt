@@ -15,6 +15,8 @@ data class SavedItem(
     val heightCm: Int,
     /** 불러올 때 기본 수량 */
     val defaultQuantity: Int = 1,
+    /** 대표 사진 (file:// URI). 없으면 기본 이미지 */
+    val photoUri: String? = null,
 ) {
     val sizeLabel: String get() = sizeLabelOf(widthCm, depthCm, heightCm)
 }
@@ -35,6 +37,7 @@ class RoomSavedItemsSource(private val dao: SavedItemDao) : SavedItemsSource {
                 depthCm = it.depthCm,
                 heightCm = it.heightCm,
                 defaultQuantity = it.defaultQuantity,
+                photoUri = it.photoUri,
             )
         }
     }

@@ -76,6 +76,7 @@ class SavedItemsViewModel(application: Application) : AndroidViewModel(applicati
                     heightCm = it.heightCm,
                     quantity = state.quantityOf(it.id),
                     savedItemId = it.id,
+                    photoUri = it.photoUri,
                 )
             }
         viewModelScope.launch { _effect.send(SavedItemsEffect.Done(picked)) }

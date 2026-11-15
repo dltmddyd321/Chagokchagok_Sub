@@ -95,6 +95,7 @@ fun RequiredItemsScreen(
             items(items, key = { it.key }) { item ->
                 ItemCard(
                     name = item.name,
+                    photoUri = item.photoUri,
                     sizeLabel = item.sizeLabel,
                     checked = item.required,
                     quantity = item.quantity,

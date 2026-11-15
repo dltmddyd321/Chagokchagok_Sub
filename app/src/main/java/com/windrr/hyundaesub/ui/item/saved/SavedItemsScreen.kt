@@ -123,6 +123,7 @@ fun SavedItemsScreen(
                     items(state.visibleItems, key = { it.id }) { item ->
                         ItemCard(
                             name = item.name,
+                            photoUri = item.photoUri,
                             sizeLabel = item.sizeLabel,
                             checked = item.id in state.selectedIds,
                             quantity = state.quantityOf(item.id),

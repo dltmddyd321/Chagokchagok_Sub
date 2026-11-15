@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.SubcomposeAsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,6 +54,8 @@ fun ItemCard(
     maxQuantity: Int = Int.MAX_VALUE,
     /** 체크 모양: false = 사각 체크박스, true = 원형 체크 (짐 선택 화면 시안) */
     circleCheck: Boolean = false,
+    /** 대표 사진 (file:// URI). 없거나 못 열면 기본 이미지 */
+    photoUri: String? = null,
 ) {
     val shape = RoundedCornerShape(20.dp)
     Column(
@@ -63,7 +68,7 @@ fun ItemCard(
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            ItemThumbnail()
+            ItemThumbnail(photoUri)
             Spacer(Modifier.width(16.dp))
             Column(
                 modifier = Modifier
@@ -105,9 +110,9 @@ fun ItemCard(
     }
 }
 
-/** 임시 썸네일: 물건 사진 받으면 Image로 교체 */
+/** 썸네일: 대표 사진이 있으면 사진, 없거나 못 열면 기본 이미지 */
 @Composable
-private fun ItemThumbnail() {
+private fun ItemThumbnail(photoUri: String?) {
     Box(
         modifier = Modifier
             .size(56.dp)
@@ -115,12 +120,25 @@ private fun ItemThumbnail() {
             .background(Brush.linearGradient(listOf(Color.White, ThumbnailTint))),
         contentAlignment = Alignment.Center,
     ) {
-        // 물건 사진이 없을 때 기본 이미지
-        Image(
-            painter = painterResource(R.drawable.img_luggage_placeholder_applied),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-        )
+        val placeholder: @Composable () -> Unit = {
+            Image(
+                painter = painterResource(R.drawable.img_luggage_placeholder_applied),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+            )
+        }
+        if (photoUri.isNullOrBlank()) {
+            placeholder()
+        } else {
+            SubcomposeAsyncImage(
+                model = photoUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { placeholder() } },
+                error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { placeholder() } },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

@@ -3,6 +3,7 @@ package com.windrr.hyundaesub.data.local
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
+import androidx.room.migration.Migration
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -49,7 +50,14 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         /** 스키마 버전. 출시 전이라 올리면 기존 로컬 데이터는 지워진다 */
-        const val VERSION = 7
+        const val VERSION = 8
+
+        /** 7 → 8: 내 짐 대표 사진 칸 추가 (기존 내 짐은 그대로) */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE saved_item ADD COLUMN photo_uri TEXT")
+            }
+        }
 
         private const val NAME = "load_plan.db"
 
@@ -60,6 +68,7 @@ abstract class AppDatabase : RoomDatabase() {
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
                     .addCallback(SeedVehicles)
+                    .addMigrations(MIGRATION_7_8)
                     // 출시 전이라 스키마가 바뀌면 기존 로컬 데이터는 버리고 새로 만든다
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()

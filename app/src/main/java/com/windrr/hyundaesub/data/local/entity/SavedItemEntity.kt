@@ -38,6 +38,9 @@ data class SavedItemEntity(
     val allowedOrientations: List<Orientation> = Orientation.ALL,
     @ColumnInfo(name = "dimension_source")
     val dimensionSource: DimensionSource,
+    /** 대표 사진 (앱 내부 저장소 file:// URI). 없으면 기본 이미지 */
+    @ColumnInfo(name = "photo_uri")
+    val photoUri: String? = null,
     /** 등록 시각 (epoch ms) — 최근 등록 순 정렬 */
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),

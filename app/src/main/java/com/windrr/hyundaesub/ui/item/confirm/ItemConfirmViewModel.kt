@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** 측정값 확인 / 직접 입력. 저장하면 내 짐(saved_item)에 등록하고 이번 계획 짐으로도 담는다 */
@@ -70,8 +72,11 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
         val s = _state.value
         if (!s.canSave || saving) return
         saving = true
+        val savedItemId = UUID.randomUUID().toString()
+        // 첫 사진이 대표 사진. AR 사진은 캐시, 갤러리 사진은 content:// 라 오래 못 쓰므로 앱 저장소로 복사
+        val photoSource = s.photos.firstOrNull()
         val saved = SavedItemEntity(
-            savedItemId = UUID.randomUUID().toString(),
+            savedItemId = savedItemId,
             name = s.name.trim(),
             widthCm = s.widthCm!!,
             depthCm = s.depthCm!!,
@@ -79,20 +84,24 @@ class ItemConfirmViewModel(application: Application) : AndroidViewModel(applicat
             defaultQuantity = s.quantity,
             dimensionSource = if (s.fromMeasure) DimensionSource.AR else DimensionSource.MANUAL,
         )
-        val item = PickedItem(
+        viewModelScope.launch {
+            val photoUri = photoSource?.let { withContext(Dispatchers.IO) { ItemPhotoStore.keep(getApplication(), it, savedItemId) } }
+            val withPhoto = saved.copy(photoUri = photoUri)
+            savedItemDao.upsert(withPhoto)
+            _effect.send(ItemConfirmEffect.Saved(pickedOf(withPhoto, s.quantity)))
+        }
+    }
+
+    private fun pickedOf(saved: SavedItemEntity, quantity: Int) = PickedItem(
             key = "saved-${saved.savedItemId}",
             name = saved.name,
             widthCm = saved.widthCm,
             depthCm = saved.depthCm,
             heightCm = saved.heightCm,
-            quantity = s.quantity,
+            quantity = quantity,
             savedItemId = saved.savedItemId,
+            photoUri = saved.photoUri,
         )
-        viewModelScope.launch {
-            savedItemDao.upsert(saved)
-            _effect.send(ItemConfirmEffect.Saved(item))
-        }
-    }
 
     private companion object {
         const val MAX_NAME_LENGTH = 20
