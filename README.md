@@ -87,6 +87,23 @@ com.windrr.hyundaesub
 
 차량 실측값과 서버 공간 모델은 [`docs/VEHICLE_TUCSON_HYBRID.md`](docs/VEHICLE_TUCSON_HYBRID.md)에 정리했습니다.
 
+## APK와 테스트 환경
+
+| 항목 | 내용 |
+|---|---|
+| APK | [`apk/차곡차곡_차곡차곡서브_release.apk`](apk/차곡차곡_차곡차곡서브_release.apk) (release 서명) |
+| 테스트 기기 | Galaxy S24 (SM-S921N). Android 9(API 28) 이상, ARCore 지원 기기 |
+| 화면 규격 | 휴대폰 세로 화면 (360dp 폭 기준 디자인) |
+| 차량 앱 | Pleos 앱은 Pleos Connect Emulator **v2.1.0** (2560×1440, 160dpi)에서 확인했습니다 → [Pleos 앱 저장소](https://github.com/dltmddyd321/Chagokchagok) |
+
+APK 설치·확인 방법:
+```bash
+adb install apk/차곡차곡_차곡차곡서브_release.apk
+```
+- AR 측정에는 카메라 권한과 'Google Play 서비스 AR'이 필요합니다. 지원하지 않는 기기에서는 직접 입력으로 짐을 등록합니다.
+- 짐 챙기기 알림(FCM)을 받으려면 알림 권한을 허용합니다.
+- 서버 접속 정보는 APK에 들어 있어 따로 설정할 것이 없습니다. 소스로 빌드할 때만 아래 `local.properties`·`google-services.json`이 필요합니다.
+
 ## 실행 방법
 
 1. Android Studio에서 프로젝트를 엽니다.
@@ -96,6 +113,13 @@ com.windrr.hyundaesub
    CHAGOK_API_USERNAME=<Basic 인증 아이디>
    CHAGOK_API_PASSWORD=<Basic 인증 비밀번호>
    CHAGOK_NOTIFICATION_KEY=<알림 API 키>
+   ```
+   release APK를 만들 때는 서명 키 정보도 같은 파일에 넣습니다(키 파일은 저장소 밖에 둡니다). 없으면 서명 없이 빌드됩니다.
+   ```properties
+   CHAGOK_RELEASE_STORE_FILE=<키 파일 경로>
+   CHAGOK_RELEASE_STORE_PASSWORD=<키 저장소 비밀번호>
+   CHAGOK_RELEASE_KEY_ALIAS=<키 별칭>
+   CHAGOK_RELEASE_KEY_PASSWORD=<키 비밀번호>
    ```
 3. Firebase 콘솔에서 받은 `google-services.json`을 `app/` 폴더에 넣습니다. 이 파일도 저장소에 올라가지 않습니다(FCM 푸시에 필요).
 4. ARCore를 지원하는 기기에 설치합니다. AR 측정에는 카메라 권한과 'Google Play 서비스 AR'이 필요합니다.
